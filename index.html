@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecture 1: Neural Networks, One Lego Block at a Time</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+  :root {
+    --orange:#eb6834; --red:#c1121f; --green:#3a9d6e;
+    --surface:#fcfcfb; --grid:#e1e0d9; --axis:#c3c2b7;
+    --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface); color: var(--ink);
+    margin: 0; padding: 0 20px 80px; line-height: 1.6;
+  }
+  main { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 1.9em; margin: 55px 0 8px; }
+  h2 { font-size: 1.4em; margin: 64px 0 12px; }
+  h3 { font-size: 1.12em; margin: 34px 0 10px; }
+  p, li { color: var(--ink2); }
+  ul { padding-left: 22px; } li { margin: 5px 0; }
+  ol { padding-left: 22px; }
+  b, strong { color: var(--ink); }
+  .spacer { height: 26px; }
+  .panel {
+    background: #fff; border: 1px solid var(--grid); border-radius: 8px;
+    padding: 16px 18px 8px; margin: 18px 0;
+  }
+  .controls { display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; color: var(--ink2); }
+  .controls label { flex: 1; min-width: 200px; }
+  .controls b { color: var(--ink); }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%;
+    height: 7px; border-radius: 4px; background: var(--grid); margin: 8px 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--thumb, var(--ink2));
+    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--thumb, var(--ink2));
+    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
+  }
+  input[type=range]::-moz-range-track {
+    height: 5px; border-radius: 3px; background: var(--grid);
+  }
+  fieldset {
+    flex: 1; min-width: 250px; border: 1px solid var(--grid); border-radius: 6px;
+    font-size: 13px; color: var(--ink2);
+  }
+  legend { font-weight: 600; }
+  button {
+    font: inherit; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--axis); background: #fff; color: var(--ink2);
+  }
+  button:hover { border-color: var(--ink2); }
+  button.primary { background: var(--orange); border-color: var(--orange); color: #fff; }
+  button.on { background: var(--ink2); border-color: var(--ink2); color: #fff; }
+  .score { font-size: 14px; color: var(--ink2); margin: 8px 0; }
+  .score b { color: var(--ink); }
+  .win { color: var(--green); font-weight: 600; }
+  svg text { font-family: inherit; }
+  pre {
+    background: #f6f5f2; border: 1px solid var(--grid); border-radius: 6px;
+    padding: 12px 14px; font-size: 12.5px; overflow-x: auto; line-height: 1.45;
+  }
+  .tabs { display: flex; gap: 8px; margin: 10px 0 0; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 70px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Lecture 1: Neural Networks, One Lego Block at a Time</h1>
+
+<div class="spacer"></div>
+
+<h2>Lecture Learning Objectives</h2>
+<ul>
+  <li>Explain what a loss function measures and minimize it by hand for a simple linear model</li>
+  <li>Describe how a linear regression model can be drawn as a neural network with weights and a bias</li>
+  <li>Explain the role of hidden nodes and activation functions in a neural network</li>
+  <li>Build, by hand, a two-node hidden layer that reproduces a straight line exactly</li>
+  <li>Explain the difference between ReLU and sigmoid activations using the same network</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Motivation</h2>
+<ul>
+  <li>Neural networks have a reputation for being complicated. They are not.</li>
+  <li>The core idea of this lecture: <b>a neural network builds its prediction by adding up
+      simple pieces</b>, like lego blocks.</li>
+  <li>We will start from a model you already know (linear regression), redraw it as the
+      simplest possible neural network, and then add a hidden layer and see exactly what it buys us.</li>
+  <li>Everything on this page is interactive. You will be adjusting the same parameters
+      that gradient descent adjusts during training. When we get to training in a later
+      lecture, you will already know exactly what the optimizer is doing.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<!-- ============================================================ 1. OLS -->
+<h2>1. Linear Regression Recap</h2>
+
+<ul>
+  <li>Let's start with the simplest supervised learning setup: one input feature $x$, one target $y$.</li>
+  <li>Our model is a straight line with two parameters, the <b>weight</b> (slope) $w$ and the <b>bias</b> (intercept) $b$:</li>
+</ul>
+
+$$\hat{y}_i = w x_i + b$$
+
+<ul>
+  <li>How do we measure how good a particular line is? With a <b>loss function</b>.
+      Here we use <b>mean squared error (MSE)</b>:</li>
+</ul>
+
+$$\mathcal{L}(w, b) = \frac{1}{n}\sum_{i=1}^{n} (\hat{y}_i - y_i)^2$$
+
+<ul>
+  <li>Smaller loss → better fit. The pair $(w^*, b^*)$ with the smallest possible loss is
+      called the <b>least-squares</b> solution, and for linear regression it has a closed-form formula.</li>
+  <li><b>Try it below:</b> drag the two sliders and try to minimize the loss by hand.
+      Then press the button to jump to the least-squares solution.</li>
+</ul>
+
+<div class="panel">
+  <div class="controls">
+    <label>weight $w$ (slope) <b id="ols-o-w"></b>
+      <input id="ols-w" type="range" min="-4" max="4" step="0.01" value="-1" style="--thumb:#eb6834;"></label>
+    <label>bias $b$ (intercept) <b id="ols-o-b"></b>
+      <input id="ols-b" type="range" min="-4" max="6" step="0.01" value="4" style="--thumb:#eb6834;"></label>
+    <div style="align-self:center;"><button id="ols-fit" class="primary">fit (least squares)</button></div>
+  </div>
+  <div class="score">loss (MSE): <b id="ols-mse"></b></div>
+  <div id="ols-fig"></div>
+</div>
+
+<div class="spacer"></div>
+
+<!-- ============================================================ 2. Neuron -->
+<h2>2. Linear Regression as a Neural Network</h2>
+
+<ul>
+  <li>Here is the same model, drawn differently. This diagram <em>is</em> our line:</li>
+</ul>
+
+<div class="panel" style="text-align:center; padding:24px 0 12px;">
+  <svg viewBox="0 0 560 190" width="100%" style="max-width:560px;">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M0,0 L10,5 L0,10 z" fill="#c3c2b7"/>
+      </marker>
+    </defs>
+    <line x1="112" y1="52"  x2="288" y2="88"  stroke="#eb6834" stroke-width="2.5" marker-end="url(#ah)"/>
+    <line x1="112" y1="138" x2="288" y2="102" stroke="#c3c2b7" stroke-width="2.5" marker-end="url(#ah)"/>
+    <line x1="352" y1="95"  x2="450" y2="95"  stroke="#c3c2b7" stroke-width="2" marker-end="url(#ah)"/>
+    <circle cx="90"  cy="45"  r="26" fill="#2a78d6"/>
+    <circle cx="90"  cy="145" r="26" fill="#898781"/>
+    <circle cx="320" cy="95"  r="34" fill="#8a63c4"/>
+    <text x="90"  y="51"  text-anchor="middle" fill="#fff" font-size="17">x</text>
+    <text x="90"  y="151" text-anchor="middle" fill="#fff" font-size="17">1</text>
+    <text x="320" y="101" text-anchor="middle" fill="#fff" font-size="14">Σ</text>
+    <text x="195" y="52"  text-anchor="middle" fill="#eb6834" font-size="14">w</text>
+    <text x="195" y="140" text-anchor="middle" fill="#898781" font-size="14">b</text>
+    <text x="475" y="100" fill="#0b0b0b" font-size="16">ŷ</text>
+  </svg>
+</div>
+
+<ul>
+  <li>How to read it:
+    <ol>
+      <li>The input node carries the feature $x$; the second input node carries the constant $1$.</li>
+      <li>Each edge multiplies the value passing through it by its own <b>weight</b>:
+          the $x$ edge carries $w$, the constant edge carries $b$.</li>
+      <li>The output node sums its incoming values: $\hat{y} = wx + b \cdot 1$.</li>
+    </ol>
+  </li>
+  <li>This unit (a weighted sum of inputs, followed by an output) is called a <b>neuron</b>.
+      Linear regression is a neural network with a single neuron and no hidden layer.</li>
+  <li>Note that <b>training changes nothing about the picture</b>. Training only changes
+      the numbers on the edges, which is exactly what you were doing with the sliders above.</li>
+  <li>One neuron can only ever draw a straight line. To draw anything else, we need to
+      put neurons <em>between</em> the input and the output: a <b>hidden layer</b>.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<!-- ============================================================ 3. Game -->
+<h2>3. Adding a Hidden Layer: Lego Blocks</h2>
+
+<ul>
+  <li>Let's add the smallest possible hidden layer: <b>two hidden nodes</b>, giving a
+      1 → 2 → 1 network.</li>
+  <li>Each hidden node computes a weighted sum, exactly like before, but then passes the
+      result through an <b>activation function</b> $\phi$ before sending it on:</li>
+</ul>
+
+$$h_i = \phi(w_i x + b_i), \qquad \hat{y} = v_1 h_1 + v_2 h_2 + c$$
+
+<ul>
+  <li>Two common choices of $\phi$:
+    <ul>
+      <li>$\text{ReLU}(z) = \max(0, z)$: outputs zero until $z$ turns positive, then a ramp;</li>
+      <li>$\sigma(z) = \frac{1}{1 + e^{-z}}$: the sigmoid, a smooth step from 0 to 1.</li>
+    </ul>
+  </li>
+  <li>The key intuition: <b>each hidden node contributes one simple shape (a lego
+      block) and the output layer adds the blocks together.</b></li>
+  <li>Each block below has three parameters: its <b>location</b> (where it bends; this sets
+      $b_i = -w_i \cdot \text{location}$), its <b>slope</b> $w_i$, and its <b>height</b>
+      $v_i$. These are exactly the parameters gradient descent tunes during training.
+      The output bias $c$ is set automatically.</li>
+  <li>The gray dots below are the <b>same data from section 1</b>, and the loss is the
+      same MSE against those points, so the numbers here are directly comparable to
+      the least-squares loss you found there.</li>
+  <li><b>Your task:</b> adjust the sliders so that the sum of the two blocks fits the data.
+      Try to match the best straight line's loss from section 1. Then see whether you
+      can go <em>below</em> it. Do it with ReLU blocks first, then switch to sigmoid.</li>
+</ul>
+
+<div class="panel">
+  <div class="tabs">
+    <button id="act-relu" class="on">ReLU</button>
+    <button id="act-sig">sigmoid</button>
+    <button id="g-fit" class="primary" style="margin-left:auto;">fit</button>
+  </div>
+  <div class="controls" style="margin-top:12px;">
+    <fieldset>
+      <legend style="color:var(--red);">hidden node 1</legend>
+      <label style="display:flex; gap:6px; align-items:center; min-width:0;">
+        <input type="checkbox" id="g-vis1" checked style="width:auto; margin:0; accent-color:#c1121f;"> show block 1</label>
+      <label>location <b id="g-o-l1"></b>
+        <input id="g-l1" type="range" min="-2.5" max="2.5" step="0.1" value="-1.5" style="--thumb:#c1121f;"></label>
+      <label>slope $w_1$ <b id="g-o-w1"></b>
+        <input id="g-w1" type="range" min="-3" max="3" step="0.1" value="1" style="--thumb:#c1121f;"></label>
+      <label>height $v_1$ <b id="g-o-v1"></b>
+        <input id="g-v1" type="range" min="-3" max="3" step="0.1" value="1" style="--thumb:#c1121f;"></label>
+    </fieldset>
+    <fieldset>
+      <legend style="color:var(--green);">hidden node 2</legend>
+      <label style="display:flex; gap:6px; align-items:center; min-width:0;">
+        <input type="checkbox" id="g-vis2" checked style="width:auto; margin:0; accent-color:#3a9d6e;"> show block 2</label>
+      <label>location <b id="g-o-l2"></b>
+        <input id="g-l2" type="range" min="-2.5" max="2.5" step="0.1" value="1.5" style="--thumb:#3a9d6e;"></label>
+      <label>slope $w_2$ <b id="g-o-w2"></b>
+        <input id="g-w2" type="range" min="-3" max="3" step="0.1" value="1" style="--thumb:#3a9d6e;"></label>
+      <label>height $v_2$ <b id="g-o-v2"></b>
+        <input id="g-v2" type="range" min="-3" max="3" step="0.1" value="1" style="--thumb:#3a9d6e;"></label>
+    </fieldset>
+  </div>
+  <div class="score">loss (MSE): <b id="g-mse"></b>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;best straight line from section 1: <b id="g-ls"></b></span>
+    <span id="g-win" class="win"></span></div>
+  <div id="g-wire"></div>
+  <div id="g-fig"></div>
+</div>
+
+<ul id="sig-note" style="display:none;">
+  <li><b>Did you notice the parameter values?</b> To act like a straight line, sigmoid
+      blocks need extreme settings: a small $w$ and a very large $v$ (press fit and watch
+      $v$ climb almost to the edge of its slider range). That is because a sum of S-curves is
+      never exactly straight; it can only stretch its nearly-linear middle across the plot.</li>
+  <li>ReLU blocks needed no such tricks: they are piecewise-straight, so a line is
+      reproduced exactly with moderate parameter values, via $a x = a\,\text{ReLU}(x) - a\,\text{ReLU}(-x)$.</li>
+  <li>Takeaway: <b>the choice of activation decides what kind of pieces the network builds
+      with</b>, and different pieces are good at different shapes.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>(Optional) The Same Network in Code</h2>
+<ul>
+  <li>The entire two-block network is a few lines of numpy:</li>
+</ul>
+<pre>
+h1 = np.maximum(0, w1 * x + b1)      # hidden node 1  (b = -w * location)
+h2 = np.maximum(0, w2 * x + b2)      # hidden node 2
+y_hat = v1 * h1 + v2 * h2 + c        # output: add the blocks
+loss  = np.mean((y_hat - y) ** 2)    # MSE, the loss you watched above
+</pre>
+<ul>
+  <li>And the same model in PyTorch. Note the one-to-one mapping between the lines of code
+      and the diagram above:</li>
+</ul>
+<pre>
+model = nn.Sequential(
+    nn.Linear(1, 2),   # x -> two hidden nodes   (the w's and b's)
+    nn.ReLU(),         # the activation          (swap in nn.Sigmoid() to compare)
+    nn.Linear(2, 1),   # add the blocks          (the v's and c)
+)
+</pre>
+
+<div class="spacer"></div>
+
+<h2>Lecture Highlights</h2>
+<ol>
+  <li>Linear regression is a neural network with a single neuron and no hidden layer.</li>
+  <li>Training means adjusting the weights and biases to minimize a loss function (here, MSE).</li>
+  <li>Each hidden node contributes one simple shape (a lego block), and the output node adds the blocks together.</li>
+  <li>Two ReLU blocks can reproduce a straight line exactly; sigmoid blocks can only approximate one.</li>
+  <li>The choice of activation function decides what kind of pieces the network builds with.</li>
+</ol>
+
+<div class="spacer"></div>
+
+<footer>
+Coming in the next lecture: more blocks, curved targets, and training, where gradient
+descent adjusts all of these parameters automatically. Companion notebooks with full derivations
+live in the same repository.
+</footer>
+
+</main>
+<script>
+"use strict";
+const C = { blue:"#2a78d6", orange:"#eb6834", red:"#c1121f", green:"#3a9d6e",
+            purple:"#8a63c4", surface:"#fcfcfb", grid:"#e1e0d9", axis:"#c3c2b7",
+            ink:"#0b0b0b", ink2:"#52514e", muted:"#898781" };
+const FONT = { family:'system-ui, -apple-system, "Segoe UI", sans-serif',
+               color:C.ink2, size:12 };
+const fmt = x => (x >= 0 ? "+" : "") + x.toFixed(2);
+const $ = id => document.getElementById(id);
+
+function paintSlider(el) {
+  const min = +el.min, max = +el.max, v = +el.value;
+  const p = ((v - min) / (max - min)) * 100;
+  const col = el.style.getPropertyValue("--thumb") || "#52514e";
+  el.style.background =
+    `linear-gradient(to right, ${col} 0%, ${col} ${p}%, #e1e0d9 ${p}%, #e1e0d9 100%)`;
+}
+function paintAll() {
+  document.querySelectorAll("input[type=range]").forEach(paintSlider);
+}
+
+function baseLayout(extra) {
+  return Object.assign({
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT,
+    margin:{l:50, r:20, t:10, b:40}, showlegend:true,
+    legend:{orientation:"h", x:0, y:1.05, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)"},
+    xaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis, title:{text:"x"}},
+    yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis},
+    hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+  }, extra || {});
+}
+
+/* ---- shared dataset: generated once, used by sections 1 and 3 ---------- */
+const DATA = (function () {
+  function rng(seed){ return function(){ let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  const r = rng(7);
+  const gauss = () => { let u = 0, v = 0;
+    while (u === 0) u = r(); while (v === 0) v = r();
+    return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v); };
+  const N = 40, xd = [], yd = [];
+  for (let i = 0; i < N; i++) {
+    const x = -3 + 6*i/(N-1);
+    xd.push(x); yd.push(1.8*x + 1 + 0.8*gauss());     // truth: y = 1.8x + 1
+  }
+  const mx = xd.reduce((a,b)=>a+b,0)/N, my = yd.reduce((a,b)=>a+b,0)/N;
+  let sxy = 0, sxx = 0;
+  for (let i = 0; i < N; i++){ sxy += (xd[i]-mx)*(yd[i]-my); sxx += (xd[i]-mx)**2; }
+  return { N, xd, yd, wStar: sxy/sxx, bStar: my - (sxy/sxx)*mx };
+})();
+
+/* ---------------------------------------------------------- 1. OLS ---- */
+(function () {
+  const { N, xd, yd, wStar, bStar } = DATA;
+  const xl = [-3.4, 3.4];
+  Plotly.newPlot("ols-fig", [
+    { x:xd, y:yd, mode:"markers", name:"data",
+      marker:{color:C.muted, size:7, opacity:0.75},
+      hovertemplate:"x = %{x:.2f}, y = %{y:.2f}<extra></extra>" },
+    { x:xl, y:[0,0], mode:"lines", name:"model",
+      line:{color:C.orange, width:2.6},
+      hovertemplate:"x = %{x:.2f}, ŷ = %{y:.2f}<extra></extra>" },
+  ], baseLayout({height:360, yaxis:{gridcolor:C.grid, zerolinecolor:C.axis,
+      linecolor:C.axis, tickcolor:C.axis, range:[-7, 9]}}),
+     {responsive:true, displayModeBar:false});
+
+  function update() {
+    const w = +$("ols-w").value, b = +$("ols-b").value;
+    $("ols-o-w").textContent = w.toFixed(2);
+    $("ols-o-b").textContent = b.toFixed(2);
+    let mse = 0;
+    for (let i = 0; i < N; i++){ const e = w*xd[i] + b - yd[i]; mse += e*e; }
+    mse /= N;
+    const isBest = Math.abs(w - wStar) < 0.03 && Math.abs(b - bStar) < 0.03;
+    $("ols-mse").innerHTML = mse.toFixed(3) + (isBest ? '  <span class="win">(the least-squares solution)</span>' : "");
+    Plotly.restyle("ols-fig", { y:[[w*xl[0]+b, w*xl[1]+b]] }, [1]);
+    paintAll();
+  }
+  ["ols-w","ols-b"].forEach(id => $(id).addEventListener("input", update));
+
+  $("ols-fit").addEventListener("click", () => {
+    const w0 = +$("ols-w").value, b0 = +$("ols-b").value, STEPS = 35;
+    let k = 0;
+    (function tick(){
+      k++;
+      const t = k/STEPS, e = 1 - Math.pow(1-t, 3);
+      $("ols-w").value = (w0 + (wStar - w0)*e).toFixed(3);
+      $("ols-b").value = (b0 + (bStar - b0)*e).toFixed(3);
+      update();
+      if (k < STEPS) requestAnimationFrame(tick);
+      else { $("ols-w").value = wStar; $("ols-b").value = bStar; update(); }
+    })();
+  });
+  update();
+})();
+
+/* ------------------------------------------------- 3. two-block game ---- */
+(function () {
+  const NX = 300, xg = [];
+  for (let i = 0; i < NX; i++){ xg.push(-3 + 6*i/(NX-1)); }
+  // reference: the least-squares line's loss on this data (section 1's best)
+  let lsMse = 0;
+  for (let i = 0; i < DATA.N; i++) {
+    const e = DATA.wStar*DATA.xd[i] + DATA.bStar - DATA.yd[i];
+    lsMse += e*e;
+  }
+  lsMse /= DATA.N;
+  let act = "relu";
+  const YH = [1.15, -1.15];
+
+  const ew = (val, scale) => Math.min(0.7 + 2.6*Math.abs(val)/scale, 3.5);
+  const actFn = z => act === "relu" ? Math.max(0, z) : 1/(1 + Math.exp(-z));
+
+  const wire = [];
+  const WI = {};
+  function wAdd(tr, key){ if (key) WI[key] = wire.length; wire.push(tr); }
+  for (let i = 0; i < 2; i++) {
+    const nm = i + 1;
+    wAdd({x:[0.55,2.0], y:[1.4,YH[i]], mode:"lines", showlegend:false,
+          line:{color:C.orange, width:2}, hovertemplate:`w${nm}<extra></extra>`}, "ew"+nm);
+    wAdd({x:[0.55,2.0], y:[-1.4,YH[i]], mode:"lines", showlegend:false,
+          line:{color:C.axis, width:2}, hovertemplate:`b${nm} = −w·location<extra></extra>`}, "eb"+nm);
+    wAdd({x:[2.2,3.75], y:[YH[i],0], mode:"lines", showlegend:false,
+          line:{color:C.blue, width:2}, hovertemplate:`v${nm}<extra></extra>`}, "ev"+nm);
+  }
+  wAdd({x:[4.0,4.0], y:[-2.2,-0.4], mode:"lines", showlegend:false,
+        line:{color:C.axis, width:1.4}, hovertemplate:"c (set automatically)<extra></extra>"}, "ec");
+  for (let i = 0; i < 2; i++)
+    wAdd({x:[2.0], y:[YH[i]], mode:"markers+text", text:["φ"], textposition:"middle center",
+          textfont:{color:"#fff", size:13}, showlegend:false,
+          marker:{size:34, color:[C.red, C.green][i], line:{color:C.surface, width:2}},
+          hovertemplate:`hidden node ${i+1}<extra></extra>`}, "n"+(i+1));
+  [[0.3,1.5,"x",C.blue],[0.3,-1.5,"1",C.muted],[4.0,-2.5,"1",C.muted]].forEach(p =>
+    wAdd({x:[p[0]], y:[p[1]], mode:"markers+text", text:[p[2]], textposition:"middle center",
+          textfont:{color:"#fff", size:12}, showlegend:false,
+          marker:{size:32, color:p[3], line:{color:C.surface, width:2}}, hoverinfo:"skip"}));
+  wAdd({x:[4.0], y:[0.0], mode:"markers+text", text:["Σ"], textposition:"middle center",
+        textfont:{color:"#fff", size:13}, showlegend:false,
+        marker:{size:42, color:C.purple, line:{color:C.surface, width:2}},
+        hovertemplate:"output node: sums the blocks + c<extra></extra>"});
+  const wireBase = [
+    {x:4.9, y:0, ax:4.45, ay:0, xref:"x", yref:"y", axref:"x", ayref:"y",
+     showarrow:true, arrowhead:3, arrowsize:1.1, arrowwidth:1.5, arrowcolor:C.axis},
+    {x:5.12, y:0, xref:"x", yref:"y", text:"ŷ", showarrow:false, font:{color:C.ink, size:15}},
+  ];
+  Plotly.newPlot("g-wire", wire, {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:235,
+    margin:{l:10, r:10, t:6, b:6}, showlegend:false,
+    xaxis:{visible:false, range:[-0.9,5.6]}, yaxis:{visible:false, range:[-2.9,2.4]},
+    annotations:wireBase,
+    hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+  }, {responsive:true, displayModeBar:false});
+
+  Plotly.newPlot("g-fig", [
+    { x:xg, y:[], mode:"lines", name:"block 1",
+      line:{color:C.red, width:2},
+      hovertemplate:"block 1<br>x = %{x:.2f}, y = %{y:.2f}<extra></extra>" },
+    { x:xg, y:[], mode:"lines", name:"block 2",
+      line:{color:C.green, width:2},
+      hovertemplate:"block 2<br>x = %{x:.2f}, y = %{y:.2f}<extra></extra>" },
+    { x:xg, y:[], mode:"lines", name:"sum of blocks + c  (the output, ŷ)",
+      line:{color:C.purple, width:2.8},
+      hovertemplate:"ŷ<br>x = %{x:.2f}, ŷ = %{y:.2f}<extra></extra>" },
+    { x:DATA.xd, y:DATA.yd, mode:"markers", name:"data (from section 1)",
+      marker:{color:C.muted, size:6, opacity:0.6},
+      hovertemplate:"x = %{x:.2f}, y = %{y:.2f}<extra></extra>" },
+  ], baseLayout({height:380, yaxis:{gridcolor:C.grid, zerolinecolor:C.axis,
+      linecolor:C.axis, tickcolor:C.axis, range:[-8,10]}}),
+    {responsive:true, displayModeBar:false});
+
+  const chip = (x, y, text, color) => ({xref:"x", yref:"y", x, y, text, showarrow:false,
+      bgcolor:C.surface, borderpad:1, opacity:0.92, font:{size:10, color}});
+
+  function update() {
+    const l1 = +$("g-l1").value, w1 = +$("g-w1").value, v1 = +$("g-v1").value;
+    const l2 = +$("g-l2").value, w2 = +$("g-w2").value, v2 = +$("g-v2").value;
+    const bb1 = -w1*l1, bb2 = -w2*l2;
+    [["g-o-l1",l1],["g-o-w1",w1],["g-o-v1",v1],
+     ["g-o-l2",l2],["g-o-w2",w2],["g-o-v2",v2]].forEach(p =>
+      $(p[0]).textContent = p[1].toFixed(1));
+
+    // c is set to whatever offset best centers the blocks on the data
+    let s = 0;
+    for (let i = 0; i < DATA.N; i++)
+      s += DATA.yd[i] - v1*actFn(w1*(DATA.xd[i]-l1)) - v2*actFn(w2*(DATA.xd[i]-l2));
+    const c = s/DATA.N;
+    // loss: MSE against the data, same as section 1
+    let mse = 0;
+    for (let i = 0; i < DATA.N; i++) {
+      const e = v1*actFn(w1*(DATA.xd[i]-l1)) + v2*actFn(w2*(DATA.xd[i]-l2)) + c - DATA.yd[i];
+      mse += e*e;
+    }
+    mse /= DATA.N;
+    // curves for the plot
+    const b1 = [], b2 = [], sum = [];
+    for (let i = 0; i < NX; i++) {
+      b1.push(v1 * actFn(w1*(xg[i]-l1)));
+      b2.push(v2 * actFn(w2*(xg[i]-l2)));
+      sum.push(b1[i] + b2[i] + c);
+    }
+
+    $("g-mse").textContent = mse.toFixed(3);
+    const win = mse < lsMse - 0.005
+      ? "(below the best straight line: the blocks are bending to chase the noise, a first glimpse of overfitting)"
+      : (mse < lsMse + 0.005 ? "(as good as the best straight line from section 1)" : "");
+    $("g-win").textContent = win;
+
+    paintAll();
+    Plotly.restyle("g-fig", {y:[b1, b2, sum]}, [0, 1, 2]);
+    const vScale = act === "relu" ? 3 : 20, cScale = act === "relu" ? 6 : 25;
+    Plotly.restyle("g-wire", {"line.width":[
+      ew(w1,3), ew(bb1,7.5), ew(v1,vScale),
+      ew(w2,3), ew(bb2,7.5), ew(v2,vScale), ew(c,cScale)]},
+      [WI.ew1, WI.eb1, WI.ev1, WI.ew2, WI.eb2, WI.ev2, WI.ec]);
+    Plotly.relayout("g-wire", {annotations: wireBase.concat([
+      chip(1.68, 1.4+0.8*(YH[0]-1.4)+0.17, fmt(w1), C.orange),
+      chip(1.68, 1.4+0.8*(YH[1]-1.4)+0.17, fmt(w2), C.orange),
+      chip(1.18, -1.4+0.45*(YH[0]+1.4)-0.18, fmt(bb1), C.muted),
+      chip(1.18, -1.4+0.45*(YH[1]+1.4)-0.18, fmt(bb2), C.muted),
+      chip(2.9, YH[0]*0.55+0.16, fmt(v1), C.blue),
+      chip(2.9, YH[1]*0.55+0.16, fmt(v2), C.blue),
+      chip(4.35, -1.3, fmt(c), C.muted)])});
+  }
+
+  function setAct(a) {
+    act = a;
+    $("act-relu").classList.toggle("on", a === "relu");
+    $("act-sig").classList.toggle("on", a === "sigmoid");
+    $("sig-note").style.display = a === "sigmoid" ? "block" : "none";
+    ["g-v1","g-v2"].forEach(id => {
+      const el = $(id);
+      if (a === "sigmoid") { el.min = -20; el.max = 20; el.step = 0.5; }
+      else { el.min = -3; el.max = 3; el.step = 0.1;
+             el.value = Math.max(-3, Math.min(3, +el.value)); }
+    });
+    Plotly.relayout("g-fig", {"yaxis.range": a === "relu" ? [-8,10] : [-13,14]});
+    update();
+  }
+  $("act-relu").addEventListener("click", () => setAct("relu"));
+  $("act-sig").addEventListener("click", () => setAct("sigmoid"));
+  ["g-l1","g-w1","g-v1","g-l2","g-w2","g-v2"].forEach(id =>
+    $(id).addEventListener("input", update));
+  $("g-ls").textContent = lsMse.toFixed(3);
+
+  [["g-vis1", 0], ["g-vis2", 1]].forEach(([id, trace]) => {
+    $(id).addEventListener("change", () => {
+      Plotly.restyle("g-fig", {visible: $(id).checked ? true : "legendonly"}, [trace]);
+    });
+  });
+
+  $("g-fit").addEventListener("click", () => {
+    // one good setting per activation (for sigmoid: the best on this slider grid)
+    const T = act === "relu"
+      ? {l1:0, w1:1.8, v1:1,    l2:0, w2:-1.8, v2:-1}
+      : {l1:0, w1:0.2, v1:18,   l2:0, w2:-0.2, v2:-18};
+    const ids = {l1:"g-l1", w1:"g-w1", v1:"g-v1", l2:"g-l2", w2:"g-w2", v2:"g-v2"};
+    const start = {};
+    for (const k in ids) start[k] = +$(ids[k]).value;
+    const STEPS = 45;
+    let k = 0;
+    (function tick(){
+      k++;
+      const e = 1 - Math.pow(1 - k/STEPS, 3);   // ease-out
+      for (const key in ids)
+        $(ids[key]).value = (start[key] + (T[key] - start[key]) * e).toFixed(3);
+      update();
+      if (k < STEPS) requestAnimationFrame(tick);
+      else { for (const key in ids) $(ids[key]).value = T[key]; update(); }
+    })();
+  });
+  update();
+})();
+</script>
+</body>
+</html>
