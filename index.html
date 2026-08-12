@@ -76,6 +76,25 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
   }
   .tabs { display: flex; gap: 8px; margin: 10px 0 0; }
   footer { color: var(--muted); font-size: 13px; margin-top: 70px; }
+  nav.side {
+    display: none; position: fixed; top: 0; left: 0; bottom: 0; width: 235px;
+    padding: 30px 18px; border-right: 1px solid var(--grid);
+    background: #faf9f6; overflow-y: auto; font-size: 13.5px; line-height: 1.45;
+  }
+  nav.side .site {
+    display: block; font-weight: 700; color: var(--ink);
+    text-decoration: none; margin-bottom: 16px;
+  }
+  nav.side a { display: block; color: var(--ink2); text-decoration: none; padding: 4px 0; }
+  nav.side a:hover { color: var(--ink); }
+  nav.side a.here { color: var(--ink); font-weight: 600; }
+  nav.side .secs { margin: 2px 0 8px; }
+  nav.side .secs a { padding: 2px 0 2px 14px; font-size: 12.5px; color: var(--muted); }
+  nav.side .secs a:hover { color: var(--ink); }
+  @media (min-width: 1120px) {
+    nav.side { display: block; }
+    body { padding-left: 275px; }
+  }
 </style>
 </head>
 <body>
@@ -612,6 +631,30 @@ const DATA = (function () {
     })();
   });
   update();
+})();
+</script>
+<nav class="side" id="sidenav"></nav>
+<script>
+(function () {
+  const chapters = [
+    ["index.html", "Chapter 1: Neural Networks, One Lego Block at a Time"],
+    ["chapter2.html", "Chapter 2: Non-linear Regression with Gradient Descent"],
+  ];
+  const here = location.pathname.split("/").pop() || "index.html";
+  let nav = '<a class="site" href="index.html">Neural nets from scratch</a>';
+  for (const [page, title] of chapters) {
+    const on = page === here;
+    nav += `<a href="${page}"${on ? ' class="here"' : ""}>${title}</a>`;
+    if (on) {
+      nav += '<div class="secs">';
+      document.querySelectorAll("main h2").forEach((h, i) => {
+        if (!h.id) h.id = "sec" + i;
+        nav += `<a href="#${h.id}">${h.textContent}</a>`;
+      });
+      nav += "</div>";
+    }
+  }
+  document.getElementById("sidenav").innerHTML = nav;
 })();
 </script>
 </body>
