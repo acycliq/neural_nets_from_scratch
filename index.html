@@ -241,6 +241,11 @@ $$h_i = \phi(w_i x + b_i), \qquad \hat{y} = v_1 h_1 + v_2 h_2 + c$$
       $b_i = -w_i \cdot \text{location}$), its <b>slope</b> $w_i$, and its <b>height</b>
       $v_i$. These are exactly the parameters gradient descent tunes during training.
       The output bias $c$ is set automatically.</li>
+  <li>Let's count parameters: 3 per block plus the output bias $c$, so <b>7 in total</b>.
+      On the diagram, that is 2 weights and 2 biases into the hidden layer, plus 2 weights
+      and 1 bias into the output node. Compare that with linear regression, which had just 2.
+      The extra flexibility comes from the extra parameters, and we will keep counting them
+      as our networks grow.</li>
   <li>The gray dots below are the <b>same data from section 1</b>, and the loss is the
       same MSE against those points, so the numbers here are directly comparable to
       the least squares loss you found there.</li>

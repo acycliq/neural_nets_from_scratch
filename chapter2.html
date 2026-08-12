@@ -146,6 +146,9 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
       location because that is what you see on the plot; the diagram shows the bias because
       that is what the network stores.</li>
   <li>Add three steps with different locations, directions, and heights, and we get a non-linear function like the one below.</li>
+  <li>Parameter count: 3 per block plus the output bias $c$, so <b>10 in total</b> (chapter 1's
+      two-block network had 7, and linear regression had 2). Each extra block contributes one
+      more step to the sum and adds 3 more parameters.</li>
   <li>Let's see if you can recover the parameter values we used: adjust the nine sliders until
       the sum passes through the middle of the data points. Note that the loss cannot reach zero
       now (the points are noisy), but it can get as low as the noise allows, and it gets there
