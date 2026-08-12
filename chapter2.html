@@ -215,8 +215,9 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
   </div>
   <div class="score">loss (MSE): <b id="g-mse"></b>
     <span style="color:var(--muted);">&nbsp;·&nbsp;epoch: <b id="g-epoch">0</b></span>
-    <span style="color:var(--muted);">&nbsp;·&nbsp;loss of the generating parameters: <b id="g-floor"></b></span>
-    <span id="g-win" class="win"></span></div>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;loss of the generating parameters: <b id="g-floor"></b></span></div>
+  <!-- reserved line: the win message comes and goes without moving the layout -->
+  <div class="score win" id="g-win" style="min-height:1.6em; margin:-2px 0 6px;"></div>
   <div class="score" id="t-compare" style="display:none;"></div>
   <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
     <input id="s-epoch" type="range" min="0" max="0" step="1" value="0" style="--thumb:#52514e;"></label>
