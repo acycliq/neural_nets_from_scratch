@@ -557,6 +557,7 @@ $("g-sketch").style.cursor = "crosshair";
 let drawing = false, lastIdx = null, lastY = null;
 function sketchAt(e) {
   const gsk = $("g-sketch");
+  // _fullLayout / p2d / _offset are private Plotly API: pinned to plotly-2.35.2 above
   const fl = gsk._fullLayout, bb = gsk.getBoundingClientRect();
   const x = fl.xaxis.p2d(e.clientX - bb.left - fl.xaxis._offset);
   const y = fl.yaxis.p2d(e.clientY - bb.top - fl.yaxis._offset);
@@ -603,9 +604,11 @@ function sketchOverlay(show) {
   Plotly.restyle("g-fig", {x: [skx], y: [sky], visible: has}, [5]);
   const line = $("t-compare");
   if (has) {
+    const net = lossAndC();
     line.style.display = "";
     line.innerHTML = `your guess, loss (MSE): <b>${m.toFixed(4)}</b>` +
-      `<span style="color:var(--muted);">&nbsp;·&nbsp;</span>the network: <b>${lossAndC().toFixed(4)}</b>`;
+      `<span style="color:var(--muted);">&nbsp;·&nbsp;</span>the network: <b>${net.toFixed(4)}</b>` +
+      (m < net ? `<span class="win"> (your guess went even lower: it is fitting the noise, not just the function!)</span>` : "");
   } else line.style.display = "none";
 }
 $("g-sketch").addEventListener("pointerdown", e => {
@@ -617,6 +620,7 @@ $("g-sketch").addEventListener("pointermove", e => {
   if (drawing) { sketchAt(e); sketchRedraw(); }
 });
 window.addEventListener("pointerup", () => { drawing = false; lastIdx = null; });
+window.addEventListener("pointercancel", () => { drawing = false; lastIdx = null; });
 $("d-clear").addEventListener("click", () => {
   sky.fill(null); sketchRedraw(); sketchOverlay(false);
 });
