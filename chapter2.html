@@ -215,6 +215,7 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
   </div>
   <div class="score">loss (MSE): <b id="g-mse"></b>
     <span style="color:var(--muted);">&nbsp;·&nbsp;epoch: <b id="g-epoch">0</b></span>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;loss of the generating parameters: <b id="g-floor"></b></span>
     <span id="g-win" class="win"></span></div>
   <div class="score" id="t-compare" style="display:none;"></div>
   <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
@@ -748,6 +749,7 @@ $("s-noise").addEventListener("input", () => {
   SIGMA = +$("s-noise").value;
   $("o-noise").textContent = SIGMA.toFixed(2);
   makeData();
+  $("g-floor").textContent = FLOOR.toFixed(4);
   Plotly.restyle("g-fig", {y: [yd]}, [0]);
   Plotly.restyle("g-sketch", {y: [yd]}, [0]);
   redraw();
@@ -805,6 +807,7 @@ setState(INIT.l, INIT.w, INIT.v);
 histReset();
 stateToSliders();
 redraw();
+$("g-floor").textContent = FLOOR.toFixed(4);
 </script>
 <nav class="side" id="sidenav"></nav>
 <script>
