@@ -4,7 +4,7 @@ Interactive notes that build neural networks from the ground up, starting from o
 
 **Read the notes here: https://acycliq.github.io/neural_nets_from_scratch/**
 
-![A network with three hidden nodes training on noisy data](demo.gif)
+![A network with three hidden nodes training on noisy data](assets/demo.gif)
 
 The demo above is from Chapter 2: a network with three sigmoid hidden nodes learns a non-linear function from noisy data by gradient descent, right in the page.
 
