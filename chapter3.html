@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 3: A Second Hidden Layer</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+  :root {
+    --orange:#eb6834; --red:#c1121f; --green:#3a9d6e; --gold:#c8930c; --plum:#a94f86;
+    --surface:#fcfcfb; --grid:#e1e0d9; --axis:#c3c2b7;
+    --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface); color: var(--ink);
+    margin: 0; padding: 0 20px 80px; line-height: 1.6;
+  }
+  main { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 1.9em; margin: 55px 0 8px; }
+  h2 { font-size: 1.4em; margin: 64px 0 12px; }
+  p, li { color: var(--ink2); }
+  ul { padding-left: 22px; } li { margin: 5px 0; }
+  ol { padding-left: 22px; }
+  b, strong { color: var(--ink); }
+  .spacer { height: 26px; }
+  .panel {
+    background: #fff; border: 1px solid var(--grid); border-radius: 8px;
+    padding: 16px 18px 8px; margin: 18px 0;
+  }
+  .controls { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--ink2); }
+  .controls b { color: var(--ink); }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%;
+    height: 7px; border-radius: 4px; background: var(--grid); margin: 8px 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--thumb, var(--ink2));
+    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--thumb, var(--ink2));
+    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
+  }
+  input[type=range]::-moz-range-track {
+    height: 5px; border-radius: 3px; background: var(--grid);
+  }
+  fieldset {
+    flex: 1; min-width: 210px; border: 1px solid var(--grid); border-radius: 6px;
+    font-size: 13px; color: var(--ink2);
+  }
+  legend { font-weight: 600; }
+  button {
+    font: inherit; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--axis); background: #fff; color: var(--ink2);
+  }
+  button:hover { border-color: var(--ink2); }
+  button.primary { background: var(--orange); border-color: var(--orange); color: #fff; }
+  .score { font-size: 14px; color: var(--ink2); margin: 8px 0; }
+  .score b { color: var(--ink); }
+  .win { color: var(--muted); }
+  svg text { font-family: inherit; }
+  pre {
+    background: #f6f5f2; border: 1px solid var(--grid); border-radius: 6px;
+    padding: 12px 14px; font-size: 12.5px; overflow-x: auto; line-height: 1.45;
+  }
+  .tabs { display: flex; gap: 8px; margin: 10px 0 0; }
+  table.count { border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  table.count th, table.count td { border: 1px solid var(--grid); padding: 6px 14px; color: var(--ink2); }
+  table.count th { background: #f6f5f2; color: var(--ink); font-weight: 600; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 70px; }
+  a { color: var(--orange); }
+  nav.side {
+    display: none; position: fixed; top: 0; left: 0; bottom: 0; width: 235px;
+    padding: 30px 18px; border-right: 1px solid var(--grid);
+    background: #faf9f6; overflow-y: auto; font-size: 13.5px; line-height: 1.45;
+  }
+  nav.side .site {
+    display: block; font-weight: 700; color: var(--ink);
+    text-decoration: none; margin-bottom: 16px;
+  }
+  nav.side a { display: block; color: var(--ink2); text-decoration: none; padding: 4px 0; }
+  nav.side a:hover { color: var(--ink); }
+  nav.side a.here { color: var(--ink); font-weight: 600; }
+  nav.side .secs { margin: 2px 0 8px; }
+  nav.side .secs a { padding: 2px 0 2px 14px; font-size: 12.5px; color: var(--muted); }
+  nav.side .secs a:hover { color: var(--ink); }
+  @media (min-width: 1120px) {
+    nav.side { display: block; }
+    body { padding-left: 275px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Chapter 3: A Second Hidden Layer</h1>
+
+<div class="spacer"></div>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Recognize <b>underfitting</b>: a loss that stays above the noise level no matter how long we train</li>
+  <li>Fix an underfit network two ways: more nodes in the hidden layer, and a second hidden layer</li>
+  <li>Explain what a second-layer node sees, and how blocks made of blocks arise</li>
+  <li>Compare the two fixes by counting parameters</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Motivation</h2>
+<ul>
+  <li>In chapter 2, gradient descent found the three blocks behind our noisy data.
+      The function had three steps and the network had three blocks: a perfect match.</li>
+  <li>But what happens when the function has <b>more steps than the network has blocks</b>?
+      We generated new data to find out (again from a recipe we are keeping hidden, again with a little noise).</li>
+  <li>The plan: watch the chapter 2 network fail, then fix it two different ways, and count
+      the parameters of each fix.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>1. A Harder Function</h2>
+<ul>
+  <li>The gray points below follow a function with <b>four steps</b> (down, up, down, up:
+      two valleys with a hill between them), plus the usual noise.</li>
+  <li>The network is exactly the one from chapter 2: three sigmoid blocks and an output bias,
+      10 parameters. Press <b>train</b> and let gradient descent run.</li>
+  <li>Or try the sliders yourself first. Each block gives one step, and the data has four,
+      so however you place three blocks, one piece of the function must be given up.</li>
+</ul>
+
+<div class="panel">
+  <div class="tabs">
+    <button id="pA-train" class="primary">train</button>
+    <button id="pA-reset">reset</button>
+  </div>
+  <div class="controls" style="margin-top:12px;">
+    <fieldset>
+      <legend style="color:var(--red);">hidden node 1</legend>
+      <label>location <b id="pA-o-l1"></b>
+        <input id="pA-l1" type="range" min="-5" max="5" step="0.1" value="-3" style="--thumb:#c1121f;"></label>
+      <label>slope $w_1$ <b id="pA-o-w1"></b>
+        <input id="pA-w1" type="range" min="-3" max="3" step="0.1" value="1" style="--thumb:#c1121f;"></label>
+      <label>height $v_1$ <b id="pA-o-v1"></b>
+        <input id="pA-v1" type="range" min="-3" max="3" step="0.1" value="0.3" style="--thumb:#c1121f;"></label>
+    </fieldset>
+    <fieldset>
+      <legend style="color:var(--green);">hidden node 2</legend>
+      <label>location <b id="pA-o-l2"></b>
+        <input id="pA-l2" type="range" min="-5" max="5" step="0.1" value="0" style="--thumb:#3a9d6e;"></label>
+      <label>slope $w_2$ <b id="pA-o-w2"></b>
+        <input id="pA-w2" type="range" min="-3" max="3" step="0.1" value="1" style="--thumb:#3a9d6e;"></label>
+      <label>height $v_2$ <b id="pA-o-v2"></b>
+        <input id="pA-v2" type="range" min="-3" max="3" step="0.1" value="-0.3" style="--thumb:#3a9d6e;"></label>
+    </fieldset>
+    <fieldset>
+      <legend style="color:var(--gold);">hidden node 3</legend>
+      <label>location <b id="pA-o-l3"></b>
+        <input id="pA-l3" type="range" min="-5" max="5" step="0.1" value="3" style="--thumb:#c8930c;"></label>
+      <label>slope $w_3$ <b id="pA-o-w3"></b>
+        <input id="pA-w3" type="range" min="-3" max="3" step="0.1" value="1" style="--thumb:#c8930c;"></label>
+      <label>height $v_3$ <b id="pA-o-v3"></b>
+        <input id="pA-v3" type="range" min="-3" max="3" step="0.1" value="0.3" style="--thumb:#c8930c;"></label>
+    </fieldset>
+  </div>
+  <div class="score">loss (MSE): <b id="pA-mse"></b>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;epoch: <b id="pA-epoch">0</b></span>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;loss of the generating parameters: <b id="pA-floor"></b></span></div>
+  <div class="score win" id="pA-win" style="min-height:1.6em; margin:-2px 0 6px;"></div>
+  <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
+    <input id="pA-replay" type="range" min="0" max="0" step="1" value="0" style="--thumb:#52514e;"></label>
+  <div id="pA-fig"></div>
+</div>
+
+<ul>
+  <li>Training runs its full 400,000 epochs and the loss gets stuck well above the loss of
+      the generating parameters. <b>No amount of extra training fixes this.</b> The problem is
+      not the optimizer; the network simply cannot represent the function.</li>
+  <li>This situation is called <b>underfitting</b>: the model does not have enough flexibility
+      to match the pattern in the data. Watch the replay: gradient descent does its best and
+      then ends up with a compromise (typically it fits one valley properly and puts a flat
+      line through the rest).</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>2. Fix One: More Nodes in the Hidden Layer</h2>
+<ul>
+  <li>The obvious fix: if three blocks are not enough, use four. Four steps in the data,
+      four blocks in the network, a 1 → 4 → 1 architecture.</li>
+  <li>No sliders this time: gradient descent does the fitting, and we watch.</li>
+</ul>
+
+<div class="panel">
+  <div class="tabs">
+    <button id="pB-train" class="primary">train</button>
+    <button id="pB-reset">reset</button>
+  </div>
+  <div class="score">loss (MSE): <b id="pB-mse"></b>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;epoch: <b id="pB-epoch">0</b></span>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;loss of the generating parameters: <b id="pB-floor"></b></span></div>
+  <div class="score win" id="pB-win" style="min-height:1.6em; margin:-2px 0 6px;"></div>
+  <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
+    <input id="pB-replay" type="range" min="0" max="0" step="1" value="0" style="--thumb:#52514e;"></label>
+  <div id="pB-fig"></div>
+</div>
+
+<ul>
+  <li>The loss now goes all the way down to the noise level: four blocks can build four steps.</li>
+  <li>Parameter count: 3 per block plus the output bias, so $4 \times 3 + 1 = $ <b>13</b>
+      (chapter 2's network had 10).</li>
+  <li>Note the price structure: <b>every extra step costs a full extra block</b>, 3 more
+      parameters, every time. A function with eight steps would need eight blocks
+      (25 parameters), one with twenty steps twenty blocks. The cost grows with the size of
+      the pattern, even when the pattern is the same shape over and over.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>3. Fix Two: A Second Hidden Layer</h2>
+<ul>
+  <li>Here is the other fix. Instead of making the one hidden layer wider, we put a
+      <b>second hidden layer</b> between it and the output: a 1 → 2 → 2 → 1 architecture.</li>
+  <li>The model, written out (the second layer's parameters are $u_{kj}$ and $d_k$):</li>
+</ul>
+
+$$h_j = \phi(w_j x + b_j), \qquad a_k = \phi(u_{k1} h_1 + u_{k2} h_2 + d_k), \qquad \hat{y} = v_1 a_1 + v_2 a_2 + c$$
+
+<ul>
+  <li>The key point, and the whole reason this chapter exists: <b>the second layer's nodes
+      never see $x$</b>. Their inputs are $h_1$ and $h_2$, the outputs of the first layer.
+      A first-layer block is a step in $x$; a second-layer block is <b>a step in whatever the
+      first layer built</b>.</li>
+  <li>How that builds a W shape with only two nodes per layer:
+    <ol>
+      <li>The first layer makes two steps, one rising on the left, one rising on the right.
+          With weights $u_{k1} = +u,\; u_{k2} = -u$ a second-layer node receives their
+          <b>difference</b>, and the difference of those two steps is a <b>bump</b>: near 1
+          in the middle of the plot, near 0 at both ends.</li>
+      <li>A second-layer node is then a step in that bump: it turns on where the bump is high
+          enough. A low threshold turns on over a <b>wide</b> region; a higher threshold
+          over a <b>narrow</b> one. (In the plot below: the gold and plum curves.)</li>
+      <li>The output takes the wide region with a minus sign and the narrow one with a plus
+          sign, and a W appears: down at the edges of the bump, back up in the middle.</li>
+    </ol>
+  </li>
+  <li>Both valleys of the W come from <b>the same bump</b>: one is its left side, the other its
+      right side. The pattern is built once, then used twice. That is what depth gives us.</li>
+</ul>
+
+<div class="panel">
+  <div class="tabs">
+    <button id="pC-train" class="primary">train</button>
+    <button id="pC-reset">reset</button>
+    <button id="pC-fit" style="margin-left:auto;">reveal our recipe</button>
+  </div>
+  <div class="score">loss (MSE): <b id="pC-mse"></b>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;epoch: <b id="pC-epoch">0</b></span>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;loss of the generating parameters: <b id="pC-floor"></b></span></div>
+  <div class="score win" id="pC-win" style="min-height:1.6em; margin:-2px 0 6px;"></div>
+  <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
+    <input id="pC-replay" type="range" min="0" max="0" step="1" value="0" style="--thumb:#52514e;"></label>
+  <div id="pC-wire"></div>
+  <div id="pC-fig"></div>
+</div>
+
+<ul>
+  <li>In the plot, the crimson and green curves are the first layer's steps $h_1, h_2$ (drawn
+      raw, between 0 and 1, because that is what the second layer sees). The gold and plum
+      curves are the second layer's contributions $v_1 a_1$ and $v_2 a_2$, scaled the way
+      they enter the sum, and the purple curve is their sum plus $c$.</li>
+  <li>Parameter count: 4 in the first layer (2 weights, 2 biases), 6 in the second
+      (4 weights, 2 biases), 3 in the output (2 weights, 1 bias): <b>13 in total</b>. The
+      same price as the wide network.</li>
+  <li>After training, press <b>reveal our recipe</b>. The parameters jump to the ones we used
+      to generate the data, and the purple curve barely moves. Gradient descent found a
+      <b>different recipe for the same function</b>: not the parameter values we used, but a
+      curve we cannot tell apart from them. With depth there is more than one way to build a
+      shape, and only the output matters.</li>
+  <li>Note that we gave this network a helpful starting point (large weights in the second
+      layer). Start the weights too small and gradient descent gets stuck before the W
+      appears. Deeper networks are more flexible but also harder to train; we will come back
+      to this when we discuss how deep networks are trained.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>4. Width or Depth? Count the Parameters</h2>
+
+<table class="count">
+  <tr><th>network</th><th>parameters</th><th>loss after training</th></tr>
+  <tr><td>1 → 3 → 1 (chapter 2's)</td><td>10</td><td>stuck above the noise level</td></tr>
+  <tr><td>1 → 4 → 1 (wider)</td><td>13</td><td>noise level</td></tr>
+  <tr><td>1 → 2 → 2 → 1 (deeper)</td><td>13</td><td>noise level</td></tr>
+</table>
+
+<ul>
+  <li>On this function the two fixes cost exactly the same. The difference is <b>strategy</b>:
+      the wide network used a full block for each of the four steps; the deep network built
+      one bump and got both valleys out of it.</li>
+  <li>Reuse is what scales. If the pattern in the function showed up again (eight steps), the
+      wide network would need eight blocks, paying full price each time. The deep network
+      can reuse what its first layer builds, so its cost grows much more slowly. The gap
+      grows with the size of the pattern.</li>
+  <li>This idea, <b>learn a shape once, reuse it everywhere</b>, is the heart of deep
+      learning, and we will see it again in its most famous form when we get to images:
+      convolutional networks reuse the same small pattern at every position of a picture.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>(Optional) The Same Network in Code</h2>
+
+<p>The 1 → 2 → 2 → 1 network in plain numpy. The forward pass is two matrix products with a
+sigmoid after each, plus the output layer:</p>
+
+<pre>import numpy as np
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
+w = np.array([1.0, 1.0]);   b = np.array([2.0, -2.0])                 # first hidden layer
+U = np.array([[4.0, -4.0],
+              [4.0, -4.0]]); d = np.array([-1.4, -2.9])               # second hidden layer
+v = np.array([-1.0, 1.5]);  c = 0.0                                   # output layer
+
+def forward(x):
+    H = sigmoid(np.outer(x, w) + b)     # first layer,  shape (n, 2)
+    A = sigmoid(H @ U.T + d)            # second layer, shape (n, 2)
+    return A @ v + c</pre>
+
+<p>And the training loop (predict, compare, adjust), where the adjustment is now passed
+backward through both layers:</p>
+
+<pre>lr = 0.25
+n = len(x)
+for epoch in range(400_000):
+    H = sigmoid(np.outer(x, w) + b)
+    A = sigmoid(H @ U.T + d)
+    c = np.mean(y - A @ v)
+    err = (A @ v + c) - y
+    # adjust every parameter, output layer back to the first
+    gA = np.outer(err, v) * A * (1 - A)
+    gH = (gA @ U) * H * (1 - H)
+    v -= lr * 2/n * A.T @ err
+    U -= lr * 2/n * gA.T @ H;   d -= lr * 2/n * gA.sum(axis=0)
+    w -= lr * 2/n * gH.T @ x;   b -= lr * 2/n * gH.sum(axis=0)</pre>
+
+<p>In PyTorch, adding a layer is one more line in the stack:</p>
+
+<pre>import torch
+import torch.nn as nn
+
+model = nn.Sequential(
+    nn.Linear(1, 2), nn.Sigmoid(),      # first hidden layer
+    nn.Linear(2, 2), nn.Sigmoid(),      # second hidden layer
+    nn.Linear(2, 1),                    # output layer
+)
+criterion = nn.MSELoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.25)
+
+for epoch in range(400_000):
+    loss = criterion(model(X).flatten(), y)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()</pre>
+
+<ul>
+  <li>As in chapter 2, our page sets the output bias $c$ analytically instead of adjusting it
+      by gradient, and PyTorch starts from random parameters rather than our chosen starting
+      point, so its path (and possibly its final recipe) will differ.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Chapter Highlights</h2>
+<ol>
+  <li>When the function has more steps than the network has blocks, the loss gets stuck above
+      the noise level and <b>no amount of training fixes it</b>. This is underfitting.</li>
+  <li>Fix one: more nodes in the same layer. Each new block adds one step and 3 parameters,
+      paying full price for every piece of the pattern.</li>
+  <li>Fix two: a second hidden layer. Its nodes take the first layer's outputs as inputs, so
+      they build <b>steps out of shapes</b> instead of steps out of $x$.</li>
+  <li>Both fixes cost 13 parameters here; the deep one built a single bump and used it for
+      both valleys. Reuse is why depth scales better when the same shape shows up again and
+      again.</li>
+  <li>With depth, different parameter settings can produce the same function. Gradient
+      descent found a different recipe than the one we used, and that is fine: only the
+      output matters.</li>
+</ol>
+
+<footer>
+Previous: <a href="chapter2.html">Chapter 2: Non-linear Regression with Gradient Descent</a>.
+Next: classification, where the network must choose between classes instead of predicting a number.
+</footer>
+
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const sig = z => 1/(1 + Math.exp(-z));
+const C = { orange:"#eb6834", red:"#c1121f", green:"#3a9d6e", gold:"#c8930c", plum:"#a94f86",
+            purple:"#8a63c4", blue:"#2a78d6", muted:"#898781", surface:"#fcfcfb",
+            grid:"#e1e0d9", axis:"#c3c2b7", ink:"#0b0b0b", ink2:"#52514e" };
+const FONT = { family:'system-ui, -apple-system, "Segoe UI", sans-serif', color:C.ink2, size:12 };
+
+/* ---- slider paint (colored fill up to the thumb) ------------------------- */
+function paintSlider(el) {
+  const min = +el.min, max = +el.max, v = +el.value;
+  const pct = (v - min) / (max - min) * 100;
+  const color = getComputedStyle(el).getPropertyValue("--thumb") || "#52514e";
+  el.style.background = `linear-gradient(to right, ${color} ${pct}%, var(--grid) ${pct}%)`;
+}
+function paintAll() { document.querySelectorAll("input[type=range]").forEach(paintSlider); }
+
+/* ---- data: a W drawn by a secret 1-2-2-1 network + noise ---------------- */
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rnd = mulberry32(11);
+function gauss() {
+  let u = 0, v = 0;
+  while (!u) u = rnd();
+  while (!v) v = rnd();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+const SEC = { w:[1,1], b:[2.8,-2.8], U:[[9,-9],[9,-9]], d:[-3.15,-6.48], v:[-2.2,3.2], c:1.2 };
+function genf(x) {
+  const h1 = sig(SEC.w[0]*x + SEC.b[0]), h2 = sig(SEC.w[1]*x + SEC.b[1]);
+  const a1 = sig(SEC.U[0][0]*h1 + SEC.U[0][1]*h2 + SEC.d[0]);
+  const a2 = sig(SEC.U[1][0]*h1 + SEC.U[1][1]*h2 + SEC.d[1]);
+  return SEC.c + SEC.v[0]*a1 + SEC.v[1]*a2;
+}
+const N = 90, SIGMA = 0.2, xd = [], yd = [];
+let FLOOR = 0;
+for (let i = 0; i < N; i++) {
+  const x = -6 + 12*rnd();
+  const e = gauss();
+  xd.push(x); yd.push(genf(x) + SIGMA*e);
+  FLOOR += (SIGMA*e)**2;
+}
+FLOOR /= N;
+const NX = 400, xg = [];
+for (let i = 0; i < NX; i++) xg.push(-6 + 12*i/(NX-1));
+
+/* ---- replay snapshots: log-spaced, as in chapter 2 ----------------------- */
+const MAXE = 400000;
+function shouldSnap(e) {
+  if (e <= 100) return true;
+  if (e <= 1000) return e % 10 === 0;
+  if (e <= 10000) return e % 100 === 0;
+  return e % 2000 === 0;
+}
+let TOTALSNAPS = 0;
+for (let e = 1; e <= MAXE; e++) if (shouldSnap(e)) TOTALSNAPS++;
+
+const YRANGE = [-2.4, 3.0];
+function figLayout(height) {
+  return {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height,
+    margin:{l:50, r:20, t:10, b:40}, showlegend:true,
+    legend:{orientation:"h", x:0, y:1.05, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)"},
+    xaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis, title:{text:"x"}},
+    yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis, range:YRANGE},
+  };
+}
+const CONF = {responsive:true, displayModeBar:false};
+function winText(mse, epoch, stuckMsg) {
+  if (mse < FLOOR - 5e-4) return "(even lower than the generating parameters: the network is fitting some of the noise too!)";
+  if (Math.abs(mse - FLOOR) <= 5e-4) return "(as low as the noise allows!)";
+  if (stuckMsg && epoch >= MAXE && mse > FLOOR*1.3) return stuckMsg;
+  return "";
+}
+
+/* ---- shallow panels (k sigmoid blocks, chapter 2 machinery) -------------- */
+function shallowPanel(cfg) {
+  const k = cfg.k, pre = cfg.pre;
+  const P = { w: cfg.init.w.slice(), b: cfg.init.b.slice(), v: cfg.init.v.slice(), c: 0 };
+  let epoch = 0, training = false, hist = [];
+
+  const traces = [{ x:xd, y:yd, mode:"markers", name:"data",
+    marker:{color:C.muted, size:6, opacity:0.75},
+    hovertemplate:"x = %{x:.2f}, y = %{y:.2f}<extra></extra>" }];
+  for (let j = 0; j < k; j++)
+    traces.push({ x:xg, y:[], mode:"lines", name:`node ${j+1} activation`,
+      line:{color:cfg.colors[j], width:1.3}, hoverinfo:"skip" });
+  traces.push({ x:xg, y:[], mode:"lines", name:"network output ŷ",
+    line:{color:C.purple, width:3.6}, hoverinfo:"skip" });
+  Plotly.newPlot(pre + "-fig", traces, figLayout(360), CONF);
+
+  function lossAndC() {
+    let s = 0;
+    for (let i = 0; i < N; i++) {
+      let u = 0;
+      for (let j = 0; j < k; j++) u += P.v[j]*sig(P.w[j]*xd[i] + P.b[j]);
+      s += yd[i] - u;
+    }
+    P.c = s/N;
+    let mse = 0;
+    for (let i = 0; i < N; i++) {
+      let u = P.c;
+      for (let j = 0; j < k; j++) u += P.v[j]*sig(P.w[j]*xd[i] + P.b[j]);
+      mse += (u - yd[i])**2;
+    }
+    return mse/N;
+  }
+  function redraw() {
+    const mse = lossAndC();
+    const ys = [];
+    for (let j = 0; j < k; j++) ys.push(xg.map(x => P.v[j]*sig(P.w[j]*x + P.b[j])));
+    ys.push(xg.map(x => {
+      let u = P.c;
+      for (let j = 0; j < k; j++) u += P.v[j]*sig(P.w[j]*x + P.b[j]);
+      return u;
+    }));
+    Plotly.restyle(pre + "-fig", {y: ys}, Array.from({length: k+1}, (_, i) => i+1));
+    $(pre + "-mse").textContent = mse.toFixed(4);
+    $(pre + "-epoch").textContent = epoch;
+    $(pre + "-win").textContent = winText(mse, epoch, cfg.stuckMsg);
+    if (cfg.sliders) {
+      for (let j = 0; j < k; j++) {
+        const loc = P.w[j] !== 0 ? -P.b[j]/P.w[j] : 0;
+        $(`${pre}-o-l${j+1}`).textContent = loc.toFixed(1);
+        $(`${pre}-o-w${j+1}`).textContent = P.w[j].toFixed(1);
+        $(`${pre}-o-v${j+1}`).textContent = P.v[j].toFixed(1);
+      }
+    }
+    return mse;
+  }
+  function gdSteps(n) {
+    const LR = 0.25;
+    for (let t = 0; t < n; t++) {
+      const gw = Array(k).fill(0), gb = Array(k).fill(0), gv = Array(k).fill(0);
+      for (let i = 0; i < N; i++) {
+        const x = xd[i], a = [];
+        let u = P.c;
+        for (let j = 0; j < k; j++) { a[j] = sig(P.w[j]*x + P.b[j]); u += P.v[j]*a[j]; }
+        const err = u - yd[i];
+        for (let j = 0; j < k; j++) {
+          gv[j] += err*a[j];
+          const da = err*P.v[j]*a[j]*(1 - a[j]);
+          gw[j] += da*x; gb[j] += da;
+        }
+      }
+      for (let j = 0; j < k; j++) {
+        P.w[j] -= LR*2/N*gw[j]; P.b[j] -= LR*2/N*gb[j]; P.v[j] -= LR*2/N*gv[j];
+      }
+      epoch++;
+      if (shouldSnap(epoch)) hist.push(snap());
+    }
+  }
+  const snap = () => ({e: epoch, w: P.w.slice(), b: P.b.slice(), v: P.v.slice()});
+  function restore(h) { epoch = h.e; P.w = h.w.slice(); P.b = h.b.slice(); P.v = h.v.slice(); }
+  function histReset() {
+    hist = [snap()];
+    $(pre + "-replay").max = TOTALSNAPS;
+    $(pre + "-replay").value = 0;
+    paintSlider($(pre + "-replay"));
+  }
+  function slidersToState() {
+    for (let j = 0; j < k; j++) {
+      const loc = +$(`${pre}-l${j+1}`).value;
+      P.w[j] = +$(`${pre}-w${j+1}`).value;
+      P.b[j] = -P.w[j]*loc;
+      P.v[j] = +$(`${pre}-v${j+1}`).value;
+    }
+  }
+  function stateToSliders() {
+    if (!cfg.sliders) return;
+    for (let j = 0; j < k; j++) {
+      $(`${pre}-l${j+1}`).value = P.w[j] !== 0 ? -P.b[j]/P.w[j] : 0;
+      $(`${pre}-w${j+1}`).value = P.w[j];
+      $(`${pre}-v${j+1}`).value = P.v[j];
+    }
+    paintAll();
+  }
+  function trainLoop() {
+    if (!training) return;
+    const chunk = epoch < 100 ? 2 : epoch < 1000 ? 25 : epoch < 10000 ? 250 : 4000;
+    gdSteps(Math.min(chunk, MAXE - epoch));
+    $(pre + "-replay").value = hist.length - 1;
+    paintSlider($(pre + "-replay"));
+    stateToSliders();
+    redraw();
+    if (epoch >= MAXE) { training = false; $(pre + "-train").textContent = "train"; return; }
+    requestAnimationFrame(trainLoop);
+  }
+  $(pre + "-train").addEventListener("click", () => {
+    if (!training) { hist = hist.slice(0, Math.min(+$(pre + "-replay").value + 1, hist.length)); }
+    training = !training;
+    $(pre + "-train").textContent = training ? "pause" : "train";
+    if (training) requestAnimationFrame(trainLoop);
+  });
+  $(pre + "-reset").addEventListener("click", () => {
+    training = false; $(pre + "-train").textContent = "train";
+    epoch = 0;
+    P.w = cfg.init.w.slice(); P.b = cfg.init.b.slice(); P.v = cfg.init.v.slice();
+    histReset(); stateToSliders(); redraw();
+  });
+  $(pre + "-replay").addEventListener("input", () => {
+    training = false; $(pre + "-train").textContent = "train";
+    const i = Math.min(+$(pre + "-replay").value, hist.length - 1);
+    $(pre + "-replay").value = i;
+    paintSlider($(pre + "-replay"));
+    restore(hist[i]); stateToSliders(); redraw();
+  });
+  if (cfg.sliders) {
+    for (let j = 1; j <= k; j++)
+      ["l", "w", "v"].forEach(q =>
+        $(`${pre}-${q}${j}`).addEventListener("input", () => {
+          training = false; $(pre + "-train").textContent = "train";
+          slidersToState();
+          hist = hist.slice(0, Math.min(+$(pre + "-replay").value + 1, hist.length));
+          paintAll(); redraw();
+        }));
+  }
+  $(pre + "-floor").textContent = FLOOR.toFixed(4);
+  histReset(); stateToSliders(); redraw();
+}
+
+shallowPanel({ pre:"pA", k:3, sliders:true,
+  init:{ w:[1,1,1], b:[3, 0, -3], v:[0.3,-0.3,0.3] },
+  colors:[C.red, C.green, C.gold],
+  stuckMsg:"(still above the noise level: three blocks cannot build four steps)" });
+shallowPanel({ pre:"pB", k:4, sliders:false,
+  init:{ w:[1,1,1,1], b:[4, 1.5, -1.5, -4], v:[-0.3,0.3,0.3,-0.3] },
+  colors:[C.red, C.green, C.gold, C.plum], stuckMsg:"" });
+
+/* ---- deep panel: 1 -> 2 -> 2 -> 1 ---------------------------------------- */
+(function deepPanel() {
+  const pre = "pC";
+  const INIT = { w:[1,1], b:[2,-2], U:[[4,-4],[4,-4]], d:[-1.4,-2.9], v:[-1.0,1.5] };
+  const P = JSON.parse(JSON.stringify(INIT)); P.c = 0;
+  let epoch = 0, training = false, hist = [];
+
+  /* wiring diagram */
+  const wire = [];
+  const wAdd = t => wire.push(t);
+  const XN = 0.2, XH = 1.7, XA = 3.2, XO = 4.6;
+  const edge = (x1, y1, x2, y2, color, width, tip) => wAdd({
+    x:[x1, x2], y:[y1, y2], mode:"lines", showlegend:false,
+    line:{color, width}, hovertemplate: tip ? tip + "<extra></extra>" : undefined,
+    hoverinfo: tip ? undefined : "skip" });
+  // x -> first layer (orange), bias -> first layer (gray)
+  edge(XN, 1.3, XH, 1.0, C.orange, 2.5, "w1");
+  edge(XN, 1.3, XH, -1.0, C.orange, 2.5, "w2");
+  edge(XN, -1.3, XH, 1.0, C.axis, 1.4, "b1");
+  edge(XN, -1.3, XH, -1.0, C.axis, 1.4, "b2");
+  // first layer -> second layer (orange), bias -> second layer (gray)
+  edge(XH, 1.0, XA, 1.0, C.orange, 2.5, "u11");
+  edge(XH, -1.0, XA, 1.0, C.orange, 2.5, "u12");
+  edge(XH, 1.0, XA, -1.0, C.orange, 2.5, "u21");
+  edge(XH, -1.0, XA, -1.0, C.orange, 2.5, "u22");
+  edge(XH, -2.5, XA, 1.0, C.axis, 1.4, "d1");
+  edge(XH, -2.5, XA, -1.0, C.axis, 1.4, "d2");
+  // second layer -> output (blue), bias -> output (gray)
+  edge(XA, 1.0, XO, 0, C.blue, 2.5, "v1");
+  edge(XA, -1.0, XO, 0, C.blue, 2.5, "v2");
+  edge(XO, -2.5, XO, -0.35, C.axis, 1.4, "c (set automatically)");
+  // nodes
+  const node = (x, y, color, text, tip, size) => wAdd({
+    x:[x], y:[y], mode: text ? "markers+text" : "markers", text: text ? [text] : undefined,
+    textposition:"middle center", textfont:{color:"#fff", size:12}, showlegend:false,
+    marker:{size: size || 32, color, line:{color:C.surface, width:2}},
+    hovertemplate: tip ? tip + "<extra></extra>" : undefined,
+    hoverinfo: tip ? undefined : "skip" });
+  node(XN, 1.3, C.blue, "x", "input");
+  node(XN, -1.3, C.muted, "1", "constant input");
+  node(XH, -2.5, C.muted, "1", "constant input");
+  node(XO, -2.5, C.muted, "1", "constant input");
+  [[XH, 1.0, C.red, "layer 1, node 1"], [XH, -1.0, C.green, "layer 1, node 2"],
+   [XA, 1.0, C.gold, "layer 2, node 1"], [XA, -1.0, C.plum, "layer 2, node 2"]].forEach(p => {
+    node(p[0], p[1], p[2], null, p[3], 34);
+    const ix = [], iy = [];
+    for (let t = 0; t <= 20; t++) {
+      const u = t/20 - 0.5;
+      ix.push(p[0] + u*0.16); iy.push(p[1] + (sig(u*14) - 0.5)*0.3);
+    }
+    wAdd({x:ix, y:iy, mode:"lines", line:{color:"#fff", width:2}, hoverinfo:"skip", showlegend:false});
+  });
+  node(XO, 0, C.purple, "Σ", "output node: sums the second layer + c", 40);
+  const wireBase = [
+    {x:XO + 0.75, y:0, ax:XO + 0.32, ay:0, xref:"x", yref:"y", axref:"x", ayref:"y",
+     showarrow:true, arrowhead:3, arrowsize:1.1, arrowwidth:1.5, arrowcolor:C.axis},
+    {x:XO + 0.95, y:0, xref:"x", yref:"y", text:"ŷ", showarrow:false, font:{color:C.ink, size:15}},
+  ];
+  Plotly.newPlot(pre + "-wire", wire, {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:280,
+    margin:{l:10, r:10, t:6, b:6}, showlegend:false,
+    xaxis:{visible:false, range:[-0.5, 6.0]}, yaxis:{visible:false, range:[-3.0, 2.1]},
+    annotations:wireBase,
+    hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+  }, CONF);
+
+  const chip = (x, y, text, color) => ({xref:"x", yref:"y", x, y, text, showarrow:false,
+      bgcolor:C.surface, borderpad:1, opacity:0.92, font:{size:10, color}});
+  const fmt = t => (t >= 0 ? "+" : "") + t.toFixed(2);
+  const mid = (x1, y1, x2, y2, f) => [x1 + (x2 - x1)*f, y1 + (y2 - y1)*f];
+  function chips() {
+    const a = [...wireBase];
+    const put = (p, val, color) => a.push(chip(p[0], p[1] + 0.16, fmt(val), color));
+    put(mid(XN, 1.3, XH, 1.0, 0.45), P.w[0], C.orange);
+    put(mid(XN, 1.3, XH, -1.0, 0.30), P.w[1], C.orange);
+    put(mid(XN, -1.3, XH, 1.0, 0.68), P.b[0], C.muted);
+    put(mid(XN, -1.3, XH, -1.0, 0.45), P.b[1], C.muted);
+    put(mid(XH, 1.0, XA, 1.0, 0.45), P.U[0][0], C.orange);
+    put(mid(XH, -1.0, XA, 1.0, 0.28), P.U[0][1], C.orange);
+    put(mid(XH, 1.0, XA, -1.0, 0.28), P.U[1][0], C.orange);
+    put(mid(XH, -1.0, XA, -1.0, 0.45), P.U[1][1], C.orange);
+    put(mid(XH, -2.5, XA, 1.0, 0.75), P.d[0], C.muted);
+    put(mid(XH, -2.5, XA, -1.0, 0.55), P.d[1], C.muted);
+    put(mid(XA, 1.0, XO, 0, 0.5), P.v[0], C.blue);
+    put(mid(XA, -1.0, XO, 0, 0.5), P.v[1], C.blue);
+    a.push(chip(XO + 0.28, -1.4, fmt(P.c), C.muted));
+    return a;
+  }
+
+  /* function figure */
+  Plotly.newPlot(pre + "-fig", [
+    { x:xd, y:yd, mode:"markers", name:"data",
+      marker:{color:C.muted, size:6, opacity:0.75},
+      hovertemplate:"x = %{x:.2f}, y = %{y:.2f}<extra></extra>" },
+    { x:xg, y:[], mode:"lines", name:"layer 1 node 1 (h₁)", line:{color:C.red, width:1.3}, hoverinfo:"skip" },
+    { x:xg, y:[], mode:"lines", name:"layer 1 node 2 (h₂)", line:{color:C.green, width:1.3}, hoverinfo:"skip" },
+    { x:xg, y:[], mode:"lines", name:"layer 2 node 1 (v₁a₁)", line:{color:C.gold, width:1.6}, hoverinfo:"skip" },
+    { x:xg, y:[], mode:"lines", name:"layer 2 node 2 (v₂a₂)", line:{color:C.plum, width:1.6}, hoverinfo:"skip" },
+    { x:xg, y:[], mode:"lines", name:"network output ŷ", line:{color:C.purple, width:3.6}, hoverinfo:"skip" },
+  ], figLayout(380), CONF);
+
+  function fwd(x) {
+    const h1 = sig(P.w[0]*x + P.b[0]), h2 = sig(P.w[1]*x + P.b[1]);
+    const a1 = sig(P.U[0][0]*h1 + P.U[0][1]*h2 + P.d[0]);
+    const a2 = sig(P.U[1][0]*h1 + P.U[1][1]*h2 + P.d[1]);
+    return [h1, h2, a1, a2];
+  }
+  function lossAndC() {
+    let s = 0;
+    for (let i = 0; i < N; i++) {
+      const [,, a1, a2] = fwd(xd[i]);
+      s += yd[i] - (P.v[0]*a1 + P.v[1]*a2);
+    }
+    P.c = s/N;
+    let mse = 0;
+    for (let i = 0; i < N; i++) {
+      const [,, a1, a2] = fwd(xd[i]);
+      mse += (P.c + P.v[0]*a1 + P.v[1]*a2 - yd[i])**2;
+    }
+    return mse/N;
+  }
+  function redraw() {
+    const mse = lossAndC();
+    const ys = [[], [], [], [], []];
+    for (const x of xg) {
+      const [h1, h2, a1, a2] = fwd(x);
+      ys[0].push(h1); ys[1].push(h2);
+      ys[2].push(P.v[0]*a1); ys[3].push(P.v[1]*a2);
+      ys[4].push(P.c + P.v[0]*a1 + P.v[1]*a2);
+    }
+    Plotly.restyle(pre + "-fig", {y: ys}, [1, 2, 3, 4, 5]);
+    Plotly.relayout(pre + "-wire", {annotations: chips()});
+    $(pre + "-mse").textContent = mse.toFixed(4);
+    $(pre + "-epoch").textContent = epoch;
+    $(pre + "-win").textContent = winText(mse, epoch, "");
+    return mse;
+  }
+  function gdSteps(n) {
+    const LR = 0.25;
+    for (let t = 0; t < n; t++) {
+      const gw = [0,0], gb = [0,0], gU = [[0,0],[0,0]], gd = [0,0], gv = [0,0];
+      for (let i = 0; i < N; i++) {
+        const x = xd[i];
+        const h = [sig(P.w[0]*x + P.b[0]), sig(P.w[1]*x + P.b[1])];
+        const a = [sig(P.U[0][0]*h[0] + P.U[0][1]*h[1] + P.d[0]),
+                   sig(P.U[1][0]*h[0] + P.U[1][1]*h[1] + P.d[1])];
+        const err = P.c + P.v[0]*a[0] + P.v[1]*a[1] - yd[i];
+        const d2 = [err*P.v[0]*a[0]*(1 - a[0]), err*P.v[1]*a[1]*(1 - a[1])];
+        const d1 = [(d2[0]*P.U[0][0] + d2[1]*P.U[1][0])*h[0]*(1 - h[0]),
+                    (d2[0]*P.U[0][1] + d2[1]*P.U[1][1])*h[1]*(1 - h[1])];
+        for (let k2 = 0; k2 < 2; k2++) {
+          gv[k2] += err*a[k2];
+          gd[k2] += d2[k2];
+          gU[k2][0] += d2[k2]*h[0]; gU[k2][1] += d2[k2]*h[1];
+          gw[k2] += d1[k2]*x; gb[k2] += d1[k2];
+        }
+      }
+      const s = 0.25*2/N;
+      for (let k2 = 0; k2 < 2; k2++) {
+        P.w[k2] -= s*gw[k2]; P.b[k2] -= s*gb[k2];
+        P.U[k2][0] -= s*gU[k2][0]; P.U[k2][1] -= s*gU[k2][1];
+        P.d[k2] -= s*gd[k2]; P.v[k2] -= s*gv[k2];
+      }
+      epoch++;
+      if (shouldSnap(epoch)) hist.push(snap());
+    }
+  }
+  const snap = () => JSON.parse(JSON.stringify({e: epoch, w: P.w, b: P.b, U: P.U, d: P.d, v: P.v}));
+  function restore(h) {
+    epoch = h.e;
+    P.w = h.w.slice(); P.b = h.b.slice(); P.d = h.d.slice(); P.v = h.v.slice();
+    P.U = h.U.map(r => r.slice());
+  }
+  function histReset() {
+    hist = [snap()];
+    $(pre + "-replay").max = TOTALSNAPS;
+    $(pre + "-replay").value = 0;
+    paintSlider($(pre + "-replay"));
+  }
+  function trainLoop() {
+    if (!training) return;
+    const chunk = epoch < 100 ? 2 : epoch < 1000 ? 25 : epoch < 10000 ? 250 : 4000;
+    gdSteps(Math.min(chunk, MAXE - epoch));
+    $(pre + "-replay").value = hist.length - 1;
+    paintSlider($(pre + "-replay"));
+    redraw();
+    if (epoch >= MAXE) { training = false; $(pre + "-train").textContent = "train"; return; }
+    requestAnimationFrame(trainLoop);
+  }
+  $(pre + "-train").addEventListener("click", () => {
+    if (!training) hist = hist.slice(0, Math.min(+$(pre + "-replay").value + 1, hist.length));
+    training = !training;
+    $(pre + "-train").textContent = training ? "pause" : "train";
+    if (training) requestAnimationFrame(trainLoop);
+  });
+  $(pre + "-reset").addEventListener("click", () => {
+    training = false; $(pre + "-train").textContent = "train";
+    epoch = 0;
+    P.w = INIT.w.slice(); P.b = INIT.b.slice(); P.d = INIT.d.slice(); P.v = INIT.v.slice();
+    P.U = INIT.U.map(r => r.slice());
+    histReset(); redraw();
+  });
+  $(pre + "-replay").addEventListener("input", () => {
+    training = false; $(pre + "-train").textContent = "train";
+    const i = Math.min(+$(pre + "-replay").value, hist.length - 1);
+    $(pre + "-replay").value = i;
+    paintSlider($(pre + "-replay"));
+    restore(hist[i]); redraw();
+  });
+  $(pre + "-fit").addEventListener("click", () => {
+    training = false; $(pre + "-train").textContent = "train";
+    const start = JSON.parse(JSON.stringify(P));
+    const STEPS = 45; let t = 0;
+    (function tick() {
+      t++;
+      const e = 1 - Math.pow(1 - t/STEPS, 3);
+      const lerp = (a, b) => a + (b - a)*e;
+      for (let k2 = 0; k2 < 2; k2++) {
+        P.w[k2] = lerp(start.w[k2], SEC.w[k2]);
+        P.b[k2] = lerp(start.b[k2], SEC.b[k2]);
+        P.d[k2] = lerp(start.d[k2], SEC.d[k2]);
+        P.v[k2] = lerp(start.v[k2], SEC.v[k2]);
+        P.U[k2][0] = lerp(start.U[k2][0], SEC.U[k2][0]);
+        P.U[k2][1] = lerp(start.U[k2][1], SEC.U[k2][1]);
+      }
+      redraw();
+      if (t < STEPS) requestAnimationFrame(tick);
+    })();
+  });
+  $(pre + "-floor").textContent = FLOOR.toFixed(4);
+  histReset(); redraw();
+})();
+paintAll();
+</script>
+<nav class="side" id="sidenav"></nav>
+<script>
+(function () {
+  const chapters = [
+    ["index.html", "Chapter 1: Neural Networks, One Lego Block at a Time"],
+    ["chapter2.html", "Chapter 2: Non-linear Regression with Gradient Descent"],
+    ["chapter3.html", "Chapter 3: A Second Hidden Layer"],
+  ];
+  const here = location.pathname.split("/").pop() || "index.html";
+  let nav = '<a class="site" href="index.html">Neural nets from scratch</a>';
+  for (const [page, title] of chapters) {
+    const on = page === here;
+    nav += `<a href="${page}"${on ? ' class="here"' : ""}>${title}</a>`;
+    if (on) {
+      nav += '<div class="secs">';
+      document.querySelectorAll("main h2").forEach((h, i) => {
+        if (!h.id) h.id = "sec" + i;
+        nav += `<a href="#${h.id}">${h.textContent}</a>`;
+      });
+      nav += "</div>";
+    }
+  }
+  document.getElementById("sidenav").innerHTML = nav;
+})();
+</script>
+</body>
+</html>
