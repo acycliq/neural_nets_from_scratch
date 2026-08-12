@@ -246,12 +246,18 @@ loss  = np.mean((y_hat - y) ** 2)    # MSE, the loss you watched above
   <li>And the training loop behind the train button (predict, compare, adjust):</li>
 </ul>
 <pre>
-lr = 0.25          # learning rate: how much we adjust each iteration
-n  = len(x)        # number of data points
+lr = 0.25
+n = len(x)
+
+# starting values for the parameters (matching the demo's reset button)
+w = np.array([1.0, 1.0, 1.0])    # slopes
+b = np.array([3.0, 0.0, -3.0])   # biases (= -w * location)
+v = np.array([0.3, -0.3, 0.3])   # heights
+c = 0.0                          # output bias
 
 for epoch in range(400_000):
     h = sigmoid(np.outer(x, w) + b)
-    err = h @ v + c - y                        # predict and compare
+    err = h @ v + c - y
     grad_h = np.outer(err, v) * h * (1 - h)    # chain rule through the sigmoid
     v -= lr * 2/n * (h.T @ err)                # adjust every parameter
     c -= lr * 2/n * err.sum()
@@ -270,14 +276,14 @@ model = nn.Sequential(
     nn.Sigmoid(),      # the activation
     nn.Linear(3, 1),   # sum of the blocks         (the v's and c)
 )
-loss_fn = nn.MSELoss()
-opt = torch.optim.SGD(model.parameters(), lr=0.25)
+criterion = nn.MSELoss()
+optimizer = torch.optim.SGD(model.parameters(), lr=0.25)
 
 for epoch in range(400_000):
-    loss = loss_fn(model(X), Y)
-    opt.zero_grad()
+    optimizer.zero_grad()
+    loss = criterion(model(X).flatten(), y)
     loss.backward()
-    opt.step()
+    optimizer.step()
 </pre>
 
 <div class="spacer"></div>
