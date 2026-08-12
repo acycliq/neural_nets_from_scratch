@@ -243,7 +243,7 @@ y_hat = h @ v + c                    # output: sum of the blocks
 loss  = np.mean((y_hat - y) ** 2)    # MSE, the loss you watched above
 </pre>
 <ul>
-  <li>And the training loop behind the train button (predict, compare, adjust):</li>
+  <li>And a vectorized version of the same training loop (predict, compare, adjust):</li>
 </ul>
 <pre>
 lr = 0.25
