@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 2: Non-linear Regression with Gradient Descent</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+  :root {
+    --orange:#eb6834; --red:#c1121f; --green:#3a9d6e; --gold:#c8930c;
+    --surface:#fcfcfb; --grid:#e1e0d9; --axis:#c3c2b7;
+    --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface); color: var(--ink);
+    margin: 0; padding: 0 20px 80px; line-height: 1.6;
+  }
+  main { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 1.9em; margin: 55px 0 8px; }
+  h2 { font-size: 1.4em; margin: 64px 0 12px; }
+  p, li { color: var(--ink2); }
+  ul { padding-left: 22px; } li { margin: 5px 0; }
+  ol { padding-left: 22px; }
+  b, strong { color: var(--ink); }
+  .spacer { height: 26px; }
+  .panel {
+    background: #fff; border: 1px solid var(--grid); border-radius: 8px;
+    padding: 16px 18px 8px; margin: 18px 0;
+  }
+  .controls { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--ink2); }
+  .controls b { color: var(--ink); }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%;
+    height: 7px; border-radius: 4px; background: var(--grid); margin: 8px 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--thumb, var(--ink2));
+    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--thumb, var(--ink2));
+    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
+  }
+  input[type=range]::-moz-range-track {
+    height: 5px; border-radius: 3px; background: var(--grid);
+  }
+  fieldset {
+    flex: 1; min-width: 210px; border: 1px solid var(--grid); border-radius: 6px;
+    font-size: 13px; color: var(--ink2);
+  }
+  legend { font-weight: 600; }
+  button {
+    font: inherit; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--axis); background: #fff; color: var(--ink2);
+  }
+  button:hover { border-color: var(--ink2); }
+  button.primary { background: var(--orange); border-color: var(--orange); color: #fff; }
+  .score { font-size: 14px; color: var(--ink2); margin: 8px 0; }
+  .score b { color: var(--ink); }
+  .win { color: var(--muted); }
+  svg text { font-family: inherit; }
+  pre {
+    background: #f6f5f2; border: 1px solid var(--grid); border-radius: 6px;
+    padding: 12px 14px; font-size: 12.5px; overflow-x: auto; line-height: 1.45;
+  }
+  .tabs { display: flex; gap: 8px; margin: 10px 0 0; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 70px; }
+  a { color: var(--orange); }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Chapter 2: Non-linear Regression with Gradient Descent</h1>
+
+<div class="spacer"></div>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Approximate a non-linear function as a sum of sigmoid lego blocks</li>
+  <li>Explain the role of each block's location, slope, and height in shaping the sum</li>
+  <li>Describe the gradient descent loop: predict, compare, adjust</li>
+  <li>Explain what an epoch is, and watch the loss fall as training runs</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Motivation</h2>
+<ul>
+  <li>Recall from <a href="index.html">chapter 1</a> that our data followed a straight line. We didn't
+      really need a neural network for that (least squares solves it in one shot).</li>
+  <li>But most functions we care about are not straight lines. Can our lego blocks handle a
+      non-linear data? Let's find out!</li>
+  <li>The plan: first we'll fit non-linear data by hand, using three sigmoid blocks. Then
+      we'll hand the same job to <b>gradient descent</b> and watch it adjust the sliders automatically.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>1. A Non-linear Function</h2>
+<ul>
+  <li>Full disclosure: we generated the gray data points below ourselves, by evaluating a sum of
+      exactly three sigmoid blocks plus a constant and adding a little random noise. (We are not
+      revealing the parameter values yet.)</li>
+  <li>Each hidden node applies an <b>activation function</b> $\phi$; here we use the sigmoid,
+      $\phi(z) = \frac{1}{1 + e^{-z}}$. A sigmoid block is a smooth step:
+      $v \cdot \phi(w x + b)$, or equivalently $v \cdot \phi\big(w\,(x -
+      \text{location})\big)$ (the same thing, since $b = -w \cdot \text{location}$).
+      The step goes up if $v$ is positive and down if $v$ is negative.</li>
+  <li>By <b>location</b> we mean the midpoint of the step: the point where the curve is steepest,
+      halfway between its two flat levels. (For the ReLU blocks of chapter 1 the location is the
+      kink instead, the point where the ramp bends.)</li>
+  <li>A note on <b>location</b> vs <b>bias</b>, because they are easy to mix up. The network
+      itself stores a bias $b$ (the weight on the gray edge from the constant-1 node), and the
+      node computes $\phi(w x + b)$. The step's midpoint lands where $w x + b = 0$, that is, at
+      $x = -b/w$; this is what we call the location. So the two are linked by
+      $b = -w \cdot \text{location}$, but they are different numbers: for hidden node 1 below,
+      $w_1 = 2.0$ and location $= -2.0$, so $b = -(2.0) \cdot (-2.0) = +4.0$. The slider uses the
+      location because that is what you see on the chart; the diagram shows the bias because
+      that is what the network stores.</li>
+  <li>Add three steps with different locations, directions, and heights, and we get a staircase-shaped function.</li>
+  <li>Let's see if you can recover the parameter values we used: adjust the nine sliders until
+      the sum passes through the middle of the data points. Note that the loss cannot reach zero
+      now (the points are noisy), but it can reach the noise floor, and it gets there exactly when
+      your blocks match the generating ones!</li>
+  <li>(If you get stuck, the fit button jumps to the answer.)</li>
+</ul>
+
+<div class="panel">
+  <div class="tabs">
+    <button id="t-train" class="primary">train</button>
+    <button id="t-reset">reset</button>
+    <label style="margin-left:auto; display:flex; gap:8px; align-items:center; font-size:13px; color:var(--ink2); min-width:190px;">
+      noise <b id="o-noise" style="color:var(--ink);"></b>
+      <input id="s-noise" type="range" min="0" max="0.5" step="0.05" value="0.2" style="width:110px;">
+    </label>
+    <button id="t-fit">fit (reveal the answer)</button>
+  </div>
+  <div class="controls" style="margin-top:12px;">
+    <fieldset>
+      <legend style="color:var(--red);">hidden node 1</legend>
+      <label style="display:flex; gap:6px; align-items:center;">
+        <input type="checkbox" id="vis1" checked style="width:auto; margin:0; accent-color:#c1121f;"> show block 1</label>
+      <label>location <b id="o-l1"></b>
+        <input id="s-l1" type="range" min="-4" max="4" step="0.1" value="-3" style="--thumb:#c1121f;"></label>
+      <label>slope $w_1$ <b id="o-w1"></b>
+        <input id="s-w1" type="range" min="-3" max="3" step="0.1" value="1" style="--thumb:#c1121f;"></label>
+      <label>height $v_1$ <b id="o-v1"></b>
+        <input id="s-v1" type="range" min="-3" max="3" step="0.1" value="0.3" style="--thumb:#c1121f;"></label>
+    </fieldset>
+    <fieldset>
+      <legend style="color:var(--green);">hidden node 2</legend>
+      <label style="display:flex; gap:6px; align-items:center;">
+        <input type="checkbox" id="vis2" checked style="width:auto; margin:0; accent-color:#3a9d6e;"> show block 2</label>
+      <label>location <b id="o-l2"></b>
+        <input id="s-l2" type="range" min="-4" max="4" step="0.1" value="0" style="--thumb:#3a9d6e;"></label>
+      <label>slope $w_2$ <b id="o-w2"></b>
+        <input id="s-w2" type="range" min="-3" max="3" step="0.1" value="1" style="--thumb:#3a9d6e;"></label>
+      <label>height $v_2$ <b id="o-v2"></b>
+        <input id="s-v2" type="range" min="-3" max="3" step="0.1" value="-0.3" style="--thumb:#3a9d6e;"></label>
+    </fieldset>
+    <fieldset>
+      <legend style="color:var(--gold);">hidden node 3</legend>
+      <label style="display:flex; gap:6px; align-items:center;">
+        <input type="checkbox" id="vis3" checked style="width:auto; margin:0; accent-color:#c8930c;"> show block 3</label>
+      <label>location <b id="o-l3"></b>
+        <input id="s-l3" type="range" min="-4" max="4" step="0.1" value="3" style="--thumb:#c8930c;"></label>
+      <label>slope $w_3$ <b id="o-w3"></b>
+        <input id="s-w3" type="range" min="-3" max="3" step="0.1" value="1" style="--thumb:#c8930c;"></label>
+      <label>height $v_3$ <b id="o-v3"></b>
+        <input id="s-v3" type="range" min="-3" max="3" step="0.1" value="0.3" style="--thumb:#c8930c;"></label>
+    </fieldset>
+  </div>
+  <div class="score">loss (MSE): <b id="g-mse"></b>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;epoch: <b id="g-epoch">0</b></span>
+    <span id="g-win" class="win"></span></div>
+  <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
+    <input id="s-epoch" type="range" min="0" max="0" step="1" value="0" style="--thumb:#52514e;"></label>
+  <div id="g-wire"></div>
+  <div id="g-fig"></div>
+</div>
+
+<div class="spacer"></div>
+
+<h2>2. Now Let Gradient Descent Turn the Sliders</h2>
+<ul>
+  <li>Press <b>reset</b> and then <b>train</b>, and watch the sliders: they move on their own!</li>
+  <li>What's happening under the hood is a loop, repeated thousands of times:
+    <ol>
+      <li><b>Predict:</b> compute the sum of the blocks at every data point.</li>
+      <li><b>Compare:</b> measure the loss (MSE) between the sum and the data points.</li>
+      <li><b>Adjust:</b> nudge every parameter a tiny step in the direction that lowers the loss.
+          The direction comes from the <b>gradient</b> of the loss (more on how it's computed in a later chapter).</li>
+    </ol>
+  </li>
+  <li>One pass through all the data points is called an <b>epoch</b>. Watch the epoch counter:
+      the loss falls quickly at first, and then progress slows down (the last few decimals take
+      most of the epochs).</li>
+  <li>Let's compare the two buttons directly. Press <b>fit (reveal the answer)</b> and note the
+      loss. Now press <b>reset</b>, then <b>train</b>, and let all the epochs finish. The trained
+      loss is <em>lower</em> than the loss of the true generating parameters!</li>
+  <li>How can training beat the truth? Because the loss only measures the fit to these noisy
+      points. The generating parameters are the best description of the underlying function; the
+      trained parameters are the best fit to this particular noisy sample. They are answers to two
+      different questions.</li>
+  <li>Note that training's final parameters land close to the generating ones, but not exactly
+      on them, and its loss ends up slightly <em>below</em> the noise floor. With noisy data, the
+      generating parameters are no longer the best-fitting ones: the extra epochs go into fitting
+      a little bit of the noise itself. (This effect is called <b>overfitting</b>; much more on it
+      in a later chapter.)</li>
+  <li>After training finishes, drag the replay slider to move back and forth through the
+      epochs and watch the whole story again at your own pace.</li>
+  <li>Try the noise slider too. With the noise at zero, training and the generating parameters
+      agree exactly. The more noise you add, the further the trained parameters drift from the
+      generating ones.</li>
+  <li>You can also grab a slider in the middle of training (training pauses when you do). Try
+      moving one block far away and pressing train again: gradient descent fixes it!</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Chapter Highlights</h2>
+<ol>
+  <li>A sum of three sigmoid blocks can fit data generated by three sigmoids, right down to the
+      noise floor.</li>
+  <li>Each block has a location, a slope, and a height; fitting the data comes down to choosing
+      these nine numbers well.</li>
+  <li>Gradient descent is the predict, compare, adjust loop; an epoch is one pass through the data.</li>
+  <li>The loss falls quickly at first and slowly at the end.</li>
+  <li>What you did by hand with nine sliders, gradient descent does automatically (and it scales
+      to millions of parameters).</li>
+</ol>
+
+<div class="spacer"></div>
+
+<footer>
+Previous: <a href="index.html">Chapter 1: Neural Networks, One Lego Block at a Time</a>.
+More on the gradient itself (and on functions that are not made of sigmoids) in the next chapter.
+</footer>
+
+</main>
+<script>
+"use strict";
+const C = { blue:"#2a78d6", orange:"#eb6834", red:"#c1121f", green:"#3a9d6e",
+            gold:"#c8930c", purple:"#8a63c4", surface:"#fcfcfb", grid:"#e1e0d9",
+            axis:"#c3c2b7", ink:"#0b0b0b", ink2:"#52514e", muted:"#898781" };
+const FONT = { family:'system-ui, -apple-system, "Segoe UI", sans-serif',
+               color:C.ink2, size:12 };
+const fmt = x => (x >= 0 ? "+" : "") + x.toFixed(2);
+const $ = id => document.getElementById(id);
+const sig = z => 1/(1 + Math.exp(-z));
+
+function paintSlider(el) {
+  const min = +el.min, max = +el.max, v = +el.value;
+  const p = ((v - min) / (max - min)) * 100;
+  const col = el.style.getPropertyValue("--thumb") || "#52514e";
+  el.style.background =
+    `linear-gradient(to right, ${col} 0%, ${col} ${p}%, #e1e0d9 ${p}%, #e1e0d9 100%)`;
+}
+function paintAll() {
+  document.querySelectorAll("input[type=range]").forEach(paintSlider);
+}
+
+/* ---- the generating parameters and the data -------------------------- */
+const SEC = { l:[-2, 0, 2], w:[2.0, 2.5, 1.5], v:[1.2, -1.8, 0.9], c:0.4 };
+function rng(seed){ return function(){ let t = seed += 0x6D2B79F5;
+  t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+  return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rnd = rng(11);
+const gauss = () => { let u = 0, v = 0;
+  while (u === 0) u = rnd(); while (v === 0) v = rnd();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v); };
+const N = 80, xd = [], fClean = [], eps = [], yd = [];
+for (let i = 0; i < N; i++) {
+  const x = -6 + 12*rnd();                    // random x positions
+  let f = SEC.c;
+  for (let j = 0; j < 3; j++) f += SEC.v[j] * sig(SEC.w[j]*(x - SEC.l[j]));
+  xd.push(x); fClean.push(f); eps.push(gauss()); yd.push(0);
+}
+let SIGMA = 0.2, FLOOR = 0;
+function makeData() {
+  FLOOR = 0;
+  for (let i = 0; i < N; i++) {
+    yd[i] = fClean[i] + SIGMA*eps[i];
+    FLOOR += (SIGMA*eps[i])**2;
+  }
+  FLOOR /= N;
+}
+makeData();
+const NX = 400, xg = [], tg = [];
+for (let i = 0; i < NX; i++) {
+  const x = -6 + 12*i/(NX-1);
+  let y = SEC.c;
+  for (let j = 0; j < 3; j++) y += SEC.v[j] * sig(SEC.w[j]*(x - SEC.l[j]));
+  xg.push(x); tg.push(y);
+}
+
+/* ---- model state (raw parameters; sliders mirror them) ---------------- */
+const INIT = { l:[-3, 0, 3], w:[1, 1, 1], v:[0.3, -0.3, 0.3] };
+let P = null, epoch = 0, training = false;
+// dense snapshots early (where the action is), sparse later
+function shouldSnap(ep) {
+  if (ep <= 100) return true;
+  if (ep <= 1000) return ep % 10 === 0;
+  if (ep <= 10000) return ep % 100 === 0;
+  return ep % 2000 === 0;
+}
+let TOTALSNAPS = 0;
+for (let e = 1; e <= 400000; e++) if (shouldSnap(e)) TOTALSNAPS++;
+let hist = [];
+function snap() {
+  return { w:[...P.w], b:[...P.b], v:[...P.v], c:P.c, ep:epoch };
+}
+function restore(h) {
+  P = { w:[...h.w], b:[...h.b], v:[...h.v], c:h.c };
+  epoch = h.ep;
+}
+function histReset() {
+  hist = [snap()];
+  $("s-epoch").max = TOTALSNAPS;      // full training range, so the handle sweeps across
+  $("s-epoch").value = 0;
+}
+function histTruncate() {
+  const k = Math.min(+$("s-epoch").value, hist.length - 1);
+  hist = hist.slice(0, k + 1);
+}
+function setState(l, w, v) {
+  P = { w:[...w], b: l.map((li, j) => -w[j]*li), v:[...v], c:0 };
+}
+function stateToSliders() {
+  for (let j = 0; j < 3; j++) {
+    const loc = P.w[j] !== 0 ? -P.b[j]/P.w[j] : 0;
+    $("s-l"+(j+1)).value = Math.max(-4, Math.min(4, loc));
+    $("s-w"+(j+1)).value = Math.max(-3, Math.min(3, P.w[j]));
+    $("s-v"+(j+1)).value = Math.max(-3, Math.min(3, P.v[j]));
+  }
+}
+function slidersToState() {
+  const l = [], w = [], v = [];
+  for (let j = 1; j <= 3; j++) {
+    l.push(+$("s-l"+j).value); w.push(+$("s-w"+j).value); v.push(+$("s-v"+j).value);
+  }
+  setState(l, w, v);
+}
+
+/* ---- wiring figure ----------------------------------------------------- */
+const YH = [1.5, 0, -1.5];
+const ew = (val, scale) => Math.min(0.7 + 2.6*Math.abs(val)/scale, 3.5);
+const wire = [], WI = {};
+function wAdd(tr, key){ if (key) WI[key] = wire.length; wire.push(tr); }
+const NODE = [C.red, C.green, C.gold];
+for (let j = 0; j < 3; j++) {
+  wAdd({x:[0.55,2.0], y:[1.4,YH[j]], mode:"lines", showlegend:false,
+        line:{color:C.orange, width:2}, hovertemplate:`w${j+1}<extra></extra>`}, "ew"+j);
+  wAdd({x:[0.55,2.0], y:[-1.4,YH[j]], mode:"lines", showlegend:false,
+        line:{color:C.axis, width:2}, hovertemplate:`b${j+1} = −w·location<extra></extra>`}, "eb"+j);
+  wAdd({x:[2.2,3.75], y:[YH[j],0], mode:"lines", showlegend:false,
+        line:{color:C.blue, width:2}, hovertemplate:`v${j+1}<extra></extra>`}, "ev"+j);
+}
+wAdd({x:[4.0,4.0], y:[-2.4,-0.4], mode:"lines", showlegend:false,
+      line:{color:C.axis, width:1.4}, hovertemplate:"c (set automatically)<extra></extra>"}, "ec");
+for (let j = 0; j < 3; j++)
+  wAdd({x:[2.0], y:[YH[j]], mode:"markers", showlegend:false,
+        marker:{size:34, color:NODE[j], line:{color:C.surface, width:2}},
+        hovertemplate:`hidden node ${j+1} (sigmoid activation)<extra></extra>`});
+// a small white sigmoid curve drawn on each hidden node
+for (let j = 0; j < 3; j++) {
+  const ix = [], iy = [];
+  for (let t = 0; t <= 20; t++) {
+    const u = t/20 - 0.5;
+    ix.push(2.0 + u * 0.15);
+    iy.push(YH[j] + (sig(u*14) - 0.5) * 0.3);
+  }
+  wAdd({x:ix, y:iy, mode:"lines", line:{color:"#fff", width:2},
+        hoverinfo:"skip", showlegend:false});
+}
+[[0.3,1.5,"x",C.blue],[0.3,-1.5,"1",C.muted],[4.0,-2.7,"1",C.muted]].forEach(p =>
+  wAdd({x:[p[0]], y:[p[1]], mode:"markers+text", text:[p[2]], textposition:"middle center",
+        textfont:{color:"#fff", size:12}, showlegend:false,
+        marker:{size:32, color:p[3], line:{color:C.surface, width:2}}, hoverinfo:"skip"}));
+wAdd({x:[4.0], y:[0.0], mode:"markers+text", text:["Σ"], textposition:"middle center",
+      textfont:{color:"#fff", size:13}, showlegend:false,
+      marker:{size:42, color:C.purple, line:{color:C.surface, width:2}},
+      hovertemplate:"output node: sums the blocks + c<extra></extra>"});
+const wireBase = [
+  {x:4.9, y:0, ax:4.45, ay:0, xref:"x", yref:"y", axref:"x", ayref:"y",
+   showarrow:true, arrowhead:3, arrowsize:1.1, arrowwidth:1.5, arrowcolor:C.axis},
+  {x:5.12, y:0, xref:"x", yref:"y", text:"ŷ", showarrow:false, font:{color:C.ink, size:15}},
+];
+Plotly.newPlot("g-wire", wire, {
+  paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:260,
+  margin:{l:10, r:10, t:6, b:6}, showlegend:false,
+  xaxis:{visible:false, range:[-0.9,5.6]}, yaxis:{visible:false, range:[-3.1,2.6]},
+  annotations:wireBase,
+  hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+}, {responsive:true, displayModeBar:false});
+
+/* ---- function figure --------------------------------------------------- */
+Plotly.newPlot("g-fig", [
+  { x:xd, y:yd, mode:"markers", name:"data",
+    marker:{color:C.muted, size:6, opacity:0.75},
+    hovertemplate:"x = %{x:.2f}, y = %{y:.2f}<extra></extra>" },
+  { x:xg, y:[], mode:"lines", name:"node 1 activation",
+    line:{color:C.red, width:1.3},
+    hovertemplate:"block 1<br>x = %{x:.2f}, y = %{y:.2f}<extra></extra>" },
+  { x:xg, y:[], mode:"lines", name:"node 2 activation",
+    line:{color:C.green, width:1.3},
+    hovertemplate:"block 2<br>x = %{x:.2f}, y = %{y:.2f}<extra></extra>" },
+  { x:xg, y:[], mode:"lines", name:"node 3 activation",
+    line:{color:C.gold, width:1.3},
+    hovertemplate:"block 3<br>x = %{x:.2f}, y = %{y:.2f}<extra></extra>" },
+  { x:xg, y:[], mode:"lines", name:"network output ŷ  (sum of activations + c)",
+    line:{color:C.purple, width:3.6},
+    hovertemplate:"ŷ<br>x = %{x:.2f}, ŷ = %{y:.2f}<extra></extra>" },
+], {
+  paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:400,
+  margin:{l:50, r:20, t:10, b:40}, showlegend:true,
+  legend:{orientation:"h", x:0, y:1.05, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)"},
+  xaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis, title:{text:"x"}},
+  yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis, range:[-3.0, 2.4]},
+  hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+}, {responsive:true, displayModeBar:false});
+
+const chip = (x, y, text, color) => ({xref:"x", yref:"y", x, y, text, showarrow:false,
+    bgcolor:C.surface, borderpad:1, opacity:0.92, font:{size:10, color}});
+
+/* ---- forward pass, loss, redraw ---------------------------------------- */
+function lossAndC() {
+  // c is set to the offset that best centers the blocks on the data
+  let s = 0;
+  for (let i = 0; i < N; i++) {
+    let u = 0;
+    for (let j = 0; j < 3; j++) u += P.v[j] * sig(P.w[j]*xd[i] + P.b[j]);
+    s += yd[i] - u;
+  }
+  P.c = s/N;
+  let mse = 0;
+  for (let i = 0; i < N; i++) {
+    let u = P.c;
+    for (let j = 0; j < 3; j++) u += P.v[j] * sig(P.w[j]*xd[i] + P.b[j]);
+    const e = u - yd[i]; mse += e*e;
+  }
+  return mse/N;
+}
+
+function redraw() {
+  const mse = lossAndC();
+  for (let j = 0; j < 3; j++) {
+    const loc = P.w[j] !== 0 ? -P.b[j]/P.w[j] : 0;
+    $("o-l"+(j+1)).textContent = loc.toFixed(1);
+    $("o-w"+(j+1)).textContent = P.w[j].toFixed(1);
+    $("o-v"+(j+1)).textContent = P.v[j].toFixed(1);
+  }
+  const ys = [[], [], [], []];
+  for (let i = 0; i < NX; i++) {
+    let u = P.c;
+    for (let j = 0; j < 3; j++) {
+      const bj = P.v[j] * sig(P.w[j]*xg[i] + P.b[j]);
+      ys[j].push(bj); u += bj;
+    }
+    ys[3].push(u);
+  }
+  Plotly.restyle("g-fig", {y: ys}, [1, 2, 3, 4]);
+  Plotly.restyle("g-wire", {"line.width":[
+    ew(P.w[0],3), ew(P.b[0],12), ew(P.v[0],3),
+    ew(P.w[1],3), ew(P.b[1],12), ew(P.v[1],3),
+    ew(P.w[2],3), ew(P.b[2],12), ew(P.v[2],3), ew(P.c,2)]},
+    [WI.ew0, WI.eb0, WI.ev0, WI.ew1, WI.eb1, WI.ev1, WI.ew2, WI.eb2, WI.ev2, WI.ec]);
+  const anns = [...wireBase];
+  for (let j = 0; j < 3; j++) {
+    anns.push(chip(1.68, 1.4+0.8*(YH[j]-1.4)+0.17, fmt(P.w[j]), C.orange));
+    anns.push(chip(1.18, -1.4+0.45*(YH[j]+1.4)-0.18, fmt(P.b[j]), C.muted));
+    anns.push(chip(2.9, YH[j]*0.55+0.16, fmt(P.v[j]), C.blue));
+  }
+  anns.push(chip(4.35, -1.35, fmt(P.c), C.muted));
+  Plotly.relayout("g-wire", {annotations: anns});
+  $("g-mse").textContent = mse < 0.001 ? mse.toExponential(2) : mse.toFixed(4);
+  $("g-epoch").textContent = epoch;
+  // recovery check, tolerant to the three blocks being in any order
+  const PERMS = [[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+  const nearSec = PERMS.some(perm => perm.every((k, j) => {
+    const loc = P.w[k] !== 0 ? -P.b[k]/P.w[k] : 99;
+    return Math.abs(loc - SEC.l[j]) <= 0.15 && Math.abs(P.w[k] - SEC.w[j]) <= 0.2 &&
+           Math.abs(P.v[k] - SEC.v[j]) <= 0.15;
+  }));
+  $("g-win").textContent =
+    (nearSec && mse < FLOOR + 5e-4) ? "(the noise floor: these are the generating parameters!)"
+    : (mse < FLOOR - 5e-4) ? "(slightly below the noise floor: the blocks are fitting some of the noise too!)"
+    : "";
+  paintAll();
+  return mse;
+}
+
+/* ---- gradient descent --------------------------------------------------- */
+const LR = 0.25;
+function gdSteps(n) {
+  for (let k = 0; k < n; k++) {
+    const gw = [0,0,0], gb = [0,0,0], gv = [0,0,0];
+    for (let i = 0; i < N; i++) {
+      const a = [], x = xd[i];
+      let u = P.c;
+      for (let j = 0; j < 3; j++) { a.push(sig(P.w[j]*x + P.b[j])); u += P.v[j]*a[j]; }
+      const err = u - yd[i];
+      for (let j = 0; j < 3; j++) {
+        gv[j] += err * a[j];
+        const da = err * P.v[j] * a[j] * (1 - a[j]);
+        gw[j] += da * x;
+        gb[j] += da;
+      }
+    }
+    for (let j = 0; j < 3; j++) {
+      P.w[j] -= LR * 2/N * gw[j];
+      P.b[j] -= LR * 2/N * gb[j];
+      P.v[j] -= LR * 2/N * gv[j];
+    }
+    epoch++;   // c is not gradient-updated: it is set analytically in lossAndC()
+    if (shouldSnap(epoch)) hist.push(snap());
+  }
+}
+
+function trainLoop() {
+  if (!training) return;
+  // small chunks early (so the fast-moving phase is visible), big chunks later
+  const chunk = epoch < 100 ? 2 : epoch < 1000 ? 25 : epoch < 10000 ? 250 : 4000;
+  gdSteps(Math.min(chunk, 400000 - epoch));
+  $("s-epoch").value = hist.length - 1;
+  stateToSliders();
+  const mse = redraw();
+  if (epoch >= 400000) {
+    training = false;
+    $("t-train").textContent = "train";
+    return;
+  }
+  requestAnimationFrame(trainLoop);
+}
+
+/* ---- controls ----------------------------------------------------------- */
+$("t-train").addEventListener("click", () => {
+  if (!training) histTruncate();
+  training = !training;
+  $("t-train").textContent = training ? "pause" : "train";
+  if (training) requestAnimationFrame(trainLoop);
+});
+$("s-noise").addEventListener("input", () => {
+  training = false; $("t-train").textContent = "train";
+  SIGMA = +$("s-noise").value;
+  $("o-noise").textContent = SIGMA.toFixed(2);
+  makeData();
+  Plotly.restyle("g-fig", {y: [yd]}, [0]);
+  redraw();
+});
+$("o-noise").textContent = SIGMA.toFixed(2);
+
+$("t-reset").addEventListener("click", () => {
+  training = false; $("t-train").textContent = "train";
+  epoch = 0;
+  setState(INIT.l, INIT.w, INIT.v);
+  histReset();
+  stateToSliders();
+  redraw();
+});
+$("t-fit").addEventListener("click", () => {
+  training = false; $("t-train").textContent = "train";
+  const start = JSON.parse(JSON.stringify(P));
+  const target = { w: [...SEC.w],
+                   b: SEC.w.map((w,j) => -w*SEC.l[j]),
+                   v: [...SEC.v] };
+  const STEPS = 45; let k = 0;
+  (function tick(){
+    k++;
+    const e = 1 - Math.pow(1 - k/STEPS, 3);
+    for (let j = 0; j < 3; j++) {
+      P.w[j] = start.w[j] + (target.w[j] - start.w[j]) * e;
+      P.b[j] = start.b[j] + (target.b[j] - start.b[j]) * e;
+      P.v[j] = start.v[j] + (target.v[j] - start.v[j]) * e;
+    }
+    stateToSliders(); redraw();
+    if (k < STEPS) requestAnimationFrame(tick);
+  })();
+});
+$("s-epoch").addEventListener("input", () => {
+  training = false; $("t-train").textContent = "train";
+  const k = Math.min(+$("s-epoch").value, hist.length - 1);
+  $("s-epoch").value = k;
+  restore(hist[k]); stateToSliders(); redraw();
+});
+for (let j = 1; j <= 3; j++) {
+  ["s-l","s-w","s-v"].forEach(pre =>
+    $(pre+j).addEventListener("input", () => {
+      training = false; $("t-train").textContent = "train";
+      slidersToState(); histTruncate(); redraw();
+    }));
+  $("vis"+j).addEventListener("change", () =>
+    Plotly.restyle("g-fig", {visible: $("vis"+j).checked ? true : "legendonly"}, [j]));
+}
+
+setState(INIT.l, INIT.w, INIT.v);
+histReset();
+stateToSliders();
+redraw();
+</script>
+</body>
+</html>
