@@ -285,6 +285,10 @@ for epoch in range(400_000):
     loss.backward()
     optimizer.step()
 </pre>
+<ul>
+  <li>(PyTorch initializes the parameters randomly, so its path down the loss will differ from
+      the demo's; the destination is the same.)</li>
+</ul>
 
 <div class="spacer"></div>
 
