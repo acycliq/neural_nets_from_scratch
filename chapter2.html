@@ -129,6 +129,18 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
   <li>To be clear: we generated the gray data points below ourselves, by evaluating a sum of
       exactly three sigmoid blocks plus a constant and adding a little random noise. (We are not
       revealing the parameter values yet.)</li>
+  <li>Before we bring in any blocks, let's record your first guess. <b>Press and drag across
+      the plot below</b> to draw the function you think generated these points. Once gradient
+      descent has done its job later on, we will compare its answer with yours.</li>
+</ul>
+
+<div class="panel">
+  <div id="g-sketch"></div>
+  <div class="score">your guess, loss (MSE): <b id="d-mse">–</b><span id="d-hint" class="win"></span>
+    <button id="d-clear" style="float:right; font-size:12px; padding:4px 10px;">clear</button></div>
+</div>
+
+<ul>
   <li>Each hidden node applies an <b>activation function</b> $\phi$; here we use the sigmoid,
       $\phi(z) = \frac{1}{1 + e^{-z}}$. A sigmoid block is a smooth step:
       $v \cdot \phi(w x + b)$, or in other words $v \cdot \phi\big(w\,(x -
@@ -204,6 +216,7 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
   <div class="score">loss (MSE): <b id="g-mse"></b>
     <span style="color:var(--muted);">&nbsp;·&nbsp;epoch: <b id="g-epoch">0</b></span>
     <span id="g-win" class="win"></span></div>
+  <div class="score" id="t-compare" style="display:none;"></div>
   <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
     <input id="s-epoch" type="range" min="0" max="0" step="1" value="0" style="--thumb:#52514e;"></label>
   <div id="g-wire"></div>
@@ -507,6 +520,9 @@ Plotly.newPlot("g-fig", [
   { x:xg, y:[], mode:"lines", name:"network output ŷ  (sum of activations + c)",
     line:{color:C.purple, width:3.6},
     hovertemplate:"ŷ<br>x = %{x:.2f}, ŷ = %{y:.2f}<extra></extra>" },
+  { x:[], y:[], mode:"lines", name:"your guess",
+    line:{color:C.ink2, width:2, dash:"dot"}, connectgaps:false,
+    visible:false, hoverinfo:"skip" },
 ], {
   paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:400,
   margin:{l:50, r:20, t:10, b:40}, showlegend:true,
@@ -518,6 +534,92 @@ Plotly.newPlot("g-fig", [
 
 const chip = (x, y, text, color) => ({xref:"x", yref:"y", x, y, text, showarrow:false,
     bgcolor:C.surface, borderpad:1, opacity:0.92, font:{size:10, color}});
+
+/* ---- draw-your-guess figure --------------------------------------------- */
+const SKN = 121, skx = [], sky = Array(SKN).fill(null);
+for (let i = 0; i < SKN; i++) skx.push(-6 + 12*i/(SKN-1));
+Plotly.newPlot("g-sketch", [
+  { x:xd, y:yd, mode:"markers", name:"data",
+    marker:{color:C.muted, size:6, opacity:0.75}, hoverinfo:"skip" },
+  { x:skx, y:sky, mode:"lines", name:"your guess",
+    line:{color:C.ink2, width:2.6}, connectgaps:false, hoverinfo:"skip" },
+], {
+  paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:320,
+  margin:{l:50, r:20, t:10, b:40}, showlegend:true, dragmode:false,
+  legend:{orientation:"h", x:0, y:1.05, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)"},
+  xaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+         title:{text:"x"}, range:[-6.3,6.3], fixedrange:true},
+  yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+         range:[-3.0,2.4], fixedrange:true},
+}, {responsive:true, displayModeBar:false});
+$("g-sketch").style.cursor = "crosshair";
+
+let drawing = false, lastIdx = null, lastY = null;
+function sketchAt(e) {
+  const gsk = $("g-sketch");
+  const fl = gsk._fullLayout, bb = gsk.getBoundingClientRect();
+  const x = fl.xaxis.p2d(e.clientX - bb.left - fl.xaxis._offset);
+  const y = fl.yaxis.p2d(e.clientY - bb.top - fl.yaxis._offset);
+  const yc = Math.max(-3.0, Math.min(2.4, y));
+  let idx = Math.round((x + 6) / 12 * (SKN - 1));
+  idx = Math.max(0, Math.min(SKN - 1, idx));
+  if (lastIdx === null) sky[idx] = yc;
+  else {
+    // fill every grid cell crossed since the last event, so fast strokes leave no holes
+    const a = Math.min(lastIdx, idx), b = Math.max(lastIdx, idx);
+    for (let i = a; i <= b; i++) {
+      const t = b === a ? 0 : (i - a) / (b - a);
+      sky[i] = lastIdx <= idx ? lastY + t*(yc - lastY) : yc + t*(lastY - yc);
+    }
+  }
+  lastIdx = idx; lastY = yc;
+}
+function sketchMse() {
+  let s = 0, n = 0;
+  for (let i = 0; i < N; i++) {
+    const p = (xd[i] + 6) / 12 * (SKN - 1);
+    const i0 = Math.floor(p), i1 = Math.min(i0 + 1, SKN - 1);
+    if (sky[i0] === null || sky[i1] === null) continue;
+    const yv = sky[i0] + (p - i0) * (sky[i1] - sky[i0]);
+    const e = yv - yd[i]; s += e*e; n++;
+  }
+  return n ? [s/n, n] : [null, 0];
+}
+function sketchScore() {
+  const [m, n] = sketchMse();
+  if (n >= 0.9 * N) { $("d-mse").textContent = m.toFixed(4); $("d-hint").textContent = ""; }
+  else {
+    $("d-mse").textContent = "–";
+    $("d-hint").textContent = n ? "  (draw across the whole range to see your loss)" : "";
+  }
+}
+function sketchRedraw() {
+  Plotly.restyle("g-sketch", {y: [sky]}, [1]);
+  sketchScore();
+}
+function sketchOverlay(show) {
+  const [m, n] = sketchMse();
+  const has = show && n >= 0.9 * N;
+  Plotly.restyle("g-fig", {x: [skx], y: [sky], visible: has}, [5]);
+  const line = $("t-compare");
+  if (has) {
+    line.style.display = "";
+    line.innerHTML = `your guess, loss (MSE): <b>${m.toFixed(4)}</b>` +
+      `<span style="color:var(--muted);">&nbsp;·&nbsp;</span>the network: <b>${lossAndC().toFixed(4)}</b>`;
+  } else line.style.display = "none";
+}
+$("g-sketch").addEventListener("pointerdown", e => {
+  drawing = true; lastIdx = null;
+  $("g-sketch").setPointerCapture(e.pointerId);
+  sketchAt(e); sketchRedraw(); e.preventDefault();
+});
+$("g-sketch").addEventListener("pointermove", e => {
+  if (drawing) { sketchAt(e); sketchRedraw(); }
+});
+window.addEventListener("pointerup", () => { drawing = false; lastIdx = null; });
+$("d-clear").addEventListener("click", () => {
+  sky.fill(null); sketchRedraw(); sketchOverlay(false);
+});
 
 /* ---- forward pass, loss, redraw ---------------------------------------- */
 function lossAndC() {
@@ -624,6 +726,7 @@ function trainLoop() {
   if (epoch >= 400000) {
     training = false;
     $("t-train").textContent = "train";
+    sketchOverlay(true);
     return;
   }
   requestAnimationFrame(trainLoop);
@@ -631,7 +734,7 @@ function trainLoop() {
 
 /* ---- controls ----------------------------------------------------------- */
 $("t-train").addEventListener("click", () => {
-  if (!training) histTruncate();
+  if (!training) { histTruncate(); sketchOverlay(false); }
   training = !training;
   $("t-train").textContent = training ? "pause" : "train";
   if (training) requestAnimationFrame(trainLoop);
@@ -642,7 +745,10 @@ $("s-noise").addEventListener("input", () => {
   $("o-noise").textContent = SIGMA.toFixed(2);
   makeData();
   Plotly.restyle("g-fig", {y: [yd]}, [0]);
+  Plotly.restyle("g-sketch", {y: [yd]}, [0]);
   redraw();
+  sketchScore();
+  sketchOverlay(false);
 });
 $("o-noise").textContent = SIGMA.toFixed(2);
 
@@ -653,6 +759,7 @@ $("t-reset").addEventListener("click", () => {
   histReset();
   stateToSliders();
   redraw();
+  sketchOverlay(false);
 });
 $("t-fit").addEventListener("click", () => {
   training = false; $("t-train").textContent = "train";
@@ -671,6 +778,7 @@ $("t-fit").addEventListener("click", () => {
     }
     stateToSliders(); redraw();
     if (k < STEPS) requestAnimationFrame(tick);
+    else sketchOverlay(true);
   })();
 });
 $("s-epoch").addEventListener("input", () => {
