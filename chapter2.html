@@ -97,7 +97,7 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
 <ul>
   <li>Recall from <a href="index.html">chapter 1</a> that our data followed a straight line. We didn't
       really need a neural network for that (least squares solves it in one shot).</li>
-  <li>But most functions we care about are not straight lines. Can our lego blocks handle a
+  <li>But most functions we care about are not straight lines. Can our lego blocks handle
       non-linear data? Let's find out!</li>
   <li>The plan: first we'll fit non-linear data by hand, using three sigmoid blocks. Then
       we'll hand the same job to <b>gradient descent</b> and watch it adjust the sliders automatically.</li>
@@ -107,30 +107,30 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
 
 <h2>1. A Non-linear Function</h2>
 <ul>
-  <li>Full disclosure: we generated the gray data points below ourselves, by evaluating a sum of
+  <li>To be clear: we generated the gray data points below ourselves, by evaluating a sum of
       exactly three sigmoid blocks plus a constant and adding a little random noise. (We are not
       revealing the parameter values yet.)</li>
   <li>Each hidden node applies an <b>activation function</b> $\phi$; here we use the sigmoid,
       $\phi(z) = \frac{1}{1 + e^{-z}}$. A sigmoid block is a smooth step:
-      $v \cdot \phi(w x + b)$, or equivalently $v \cdot \phi\big(w\,(x -
+      $v \cdot \phi(w x + b)$, or in other words $v \cdot \phi\big(w\,(x -
       \text{location})\big)$ (the same thing, since $b = -w \cdot \text{location}$).
       The step goes up if $v$ is positive and down if $v$ is negative.</li>
-  <li>By <b>location</b> we mean the midpoint of the step: the point where the curve is steepest,
-      halfway between its two flat levels. (For the ReLU blocks of chapter 1 the location is the
-      kink instead, the point where the ramp bends.)</li>
+  <li>By <b>location</b> we mean the center of the step: the point where the curve is steepest,
+      half way between its two flat levels. (For the ReLU blocks of chapter 1 the location is
+      the point where the ramp bends.)</li>
   <li>A note on <b>location</b> vs <b>bias</b>, because they are easy to mix up. The network
       itself stores a bias $b$ (the weight on the gray edge from the constant-1 node), and the
-      node computes $\phi(w x + b)$. The step's midpoint lands where $w x + b = 0$, that is, at
+      node computes $\phi(w x + b)$. The center of the step is where $w x + b = 0$, that is, at
       $x = -b/w$; this is what we call the location. So the two are linked by
       $b = -w \cdot \text{location}$, but they are different numbers: for hidden node 1 below,
       $w_1 = 2.0$ and location $= -2.0$, so $b = -(2.0) \cdot (-2.0) = +4.0$. The slider uses the
-      location because that is what you see on the chart; the diagram shows the bias because
+      location because that is what you see on the plot; the diagram shows the bias because
       that is what the network stores.</li>
-  <li>Add three steps with different locations, directions, and heights, and we get a staircase-shaped function.</li>
+  <li>Add three steps with different locations, directions, and heights, and we get a non-linear function like the one below.</li>
   <li>Let's see if you can recover the parameter values we used: adjust the nine sliders until
       the sum passes through the middle of the data points. Note that the loss cannot reach zero
-      now (the points are noisy), but it can reach the noise floor, and it gets there exactly when
-      your blocks match the generating ones!</li>
+      now (the points are noisy), but it can get as low as the noise allows, and it gets there
+      exactly when your blocks match the generating ones!</li>
   <li>(If you get stuck, the fit button jumps to the answer.)</li>
 </ul>
 
@@ -197,8 +197,10 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
     <ol>
       <li><b>Predict:</b> compute the sum of the blocks at every data point.</li>
       <li><b>Compare:</b> measure the loss (MSE) between the sum and the data points.</li>
-      <li><b>Adjust:</b> nudge every parameter a tiny step in the direction that lowers the loss.
-          The direction comes from the <b>gradient</b> of the loss (more on how it's computed in a later chapter).</li>
+      <li><b>Adjust:</b> adjust every parameter a small amount in the direction that lowers the
+          loss. The direction comes from the <b>gradient</b> of the loss (more on how it's computed
+          in a later chapter), and the amount we adjust each iteration is controlled by the
+          <b>learning rate</b> (here 0.25).</li>
     </ol>
   </li>
   <li>One pass through all the data points is called an <b>epoch</b>. Watch the epoch counter:
@@ -211,9 +213,10 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
       points. The generating parameters are the best description of the underlying function; the
       trained parameters are the best fit to this particular noisy sample. They are answers to two
       different questions.</li>
-  <li>Note that training's final parameters land close to the generating ones, but not exactly
-      on them, and its loss ends up slightly <em>below</em> the noise floor. With noisy data, the
-      generating parameters are no longer the best-fitting ones: the extra epochs go into fitting
+  <li>Note that the final parameters from training end up close to the generating ones, but not
+      exactly on them, and the final loss is slightly <em>below</em> the loss of the generating
+      parameters. With noisy data, the generating parameters are no longer the ones with the
+      lowest loss: the extra epochs go into fitting
       a little bit of the noise itself. (This effect is called <b>overfitting</b>; much more on it
       in a later chapter.)</li>
   <li>After training finishes, drag the replay slider to move back and forth through the
@@ -227,10 +230,62 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
 
 <div class="spacer"></div>
 
+<h2>(Optional) The Same Network in Code</h2>
+<ul>
+  <li>Everything on this page is a 1 → 3 → 1 network. Here it is in numpy, forward pass first:</li>
+</ul>
+<pre>
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
+h = sigmoid(np.outer(x, w) + b)      # three hidden activations   (n, 3)
+y_hat = h @ v + c                    # output: sum of the blocks
+loss  = np.mean((y_hat - y) ** 2)    # MSE, the loss you watched above
+</pre>
+<ul>
+  <li>And the training loop behind the train button (predict, compare, adjust):</li>
+</ul>
+<pre>
+lr = 0.25          # learning rate: how much we adjust each iteration
+n  = len(x)        # number of data points
+
+for epoch in range(400_000):
+    h = sigmoid(np.outer(x, w) + b)
+    err = h @ v + c - y                        # predict and compare
+    grad_h = np.outer(err, v) * h * (1 - h)    # chain rule through the sigmoid
+    v -= lr * 2/n * (h.T @ err)                # adjust every parameter
+    c -= lr * 2/n * err.sum()
+    w -= lr * 2/n * (grad_h * x[:, None]).sum(axis=0)
+    b -= lr * 2/n * grad_h.sum(axis=0)
+</pre>
+<ul>
+  <li>(One small difference from the demo above: on this page $c$ is set automatically, while in
+      the code we simply let gradient descent update $c$ like every other parameter. Both work.)</li>
+  <li>The same model and loop in PyTorch. Note that <code>loss.backward()</code> computes all the
+      gradients for us (no chain rule by hand):</li>
+</ul>
+<pre>
+model = nn.Sequential(
+    nn.Linear(1, 3),   # x -> three hidden nodes   (the w's and b's)
+    nn.Sigmoid(),      # the activation
+    nn.Linear(3, 1),   # sum of the blocks         (the v's and c)
+)
+loss_fn = nn.MSELoss()
+opt = torch.optim.SGD(model.parameters(), lr=0.25)
+
+for epoch in range(400_000):
+    loss = loss_fn(model(X), Y)
+    opt.zero_grad()
+    loss.backward()
+    opt.step()
+</pre>
+
+<div class="spacer"></div>
+
 <h2>Chapter Highlights</h2>
 <ol>
-  <li>A sum of three sigmoid blocks can fit data generated by three sigmoids, right down to the
-      noise floor.</li>
+  <li>A sum of three sigmoid blocks can fit data generated by three sigmoids, as well as the
+      noise allows.</li>
   <li>Each block has a location, a slope, and a height; fitting the data comes down to choosing
       these nine numbers well.</li>
   <li>Gradient descent is the predict, compare, adjust loop; an epoch is one pass through the data.</li>
@@ -492,8 +547,8 @@ function redraw() {
            Math.abs(P.v[k] - SEC.v[j]) <= 0.15;
   }));
   $("g-win").textContent =
-    (nearSec && mse < FLOOR + 5e-4) ? "(the noise floor: these are the generating parameters!)"
-    : (mse < FLOOR - 5e-4) ? "(slightly below the noise floor: the blocks are fitting some of the noise too!)"
+    (nearSec && mse < FLOOR + 5e-4) ? "(as low as the noise allows: these are the generating parameters!)"
+    : (mse < FLOOR - 5e-4) ? "(even lower than the generating parameters: the blocks are fitting some of the noise too!)"
     : "";
   paintAll();
   return mse;

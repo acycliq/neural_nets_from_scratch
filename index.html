@@ -90,7 +90,7 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
   <li>Explain what a loss function measures and minimize it by hand for a simple linear model</li>
   <li>Describe how a linear regression model can be drawn as a neural network with weights and a bias</li>
   <li>Explain the role of hidden nodes and activation functions in a neural network</li>
-  <li>Build, by hand, a two-node hidden layer that reproduces a straight line exactly</li>
+  <li>Build, by hand, a hidden layer with two nodes that matches a straight line exactly</li>
   <li>Explain the difference between ReLU and sigmoid activations using the same network</li>
 </ul>
 
@@ -102,7 +102,7 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
   <li>The core idea of this chapter: <b>a neural network builds its prediction by adding up
       simple pieces</b>, like lego blocks.</li>
   <li>We will start from a model you already know (linear regression), redraw it as the
-      simplest possible neural network, and then add a hidden layer and see exactly what it buys us.</li>
+      simplest possible neural network, and then add a hidden layer and see exactly what we gain.</li>
   <li>Everything on this page is interactive. You will be adjusting the same parameters
       that gradient descent adjusts during training. When we get to training in a later
       chapter, you will already know exactly what the optimizer is doing.</li>
@@ -129,9 +129,9 @@ $$\mathcal{L}(w, b) = \frac{1}{n}\sum_{i=1}^{n} (\hat{y}_i - y_i)^2$$
 
 <ul>
   <li>Smaller loss → better fit. The pair $(w^*, b^*)$ with the smallest possible loss is
-      called the <b>least-squares</b> solution, and for linear regression it has a closed-form formula.</li>
+      called the <b>least squares</b> solution, and for linear regression it has a closed-form formula.</li>
   <li><b>Try it below:</b> drag the two sliders and try to minimize the loss by hand.
-      Then press the button to jump to the least-squares solution.</li>
+      Then press the button to jump to the least squares solution.</li>
 </ul>
 
 <div class="panel">
@@ -217,14 +217,14 @@ $$h_i = \phi(w_i x + b_i), \qquad \hat{y} = v_1 h_1 + v_2 h_2 + c$$
   </li>
   <li>The key intuition: <b>each hidden node contributes one simple shape (a lego
       block) and the output layer adds the blocks together.</b></li>
-  <li>Each block below has three parameters: its <b>location</b> (the kink of a ReLU ramp, or
-      the midpoint of a sigmoid step; this sets
+  <li>Each block below has three parameters: its <b>location</b> (the point where a ReLU ramp
+      bends, or the center of a sigmoid step; this sets
       $b_i = -w_i \cdot \text{location}$), its <b>slope</b> $w_i$, and its <b>height</b>
       $v_i$. These are exactly the parameters gradient descent tunes during training.
       The output bias $c$ is set automatically.</li>
   <li>The gray dots below are the <b>same data from section 1</b>, and the loss is the
       same MSE against those points, so the numbers here are directly comparable to
-      the least-squares loss you found there.</li>
+      the least squares loss you found there.</li>
   <li><b>Your task:</b> adjust the sliders so that the sum of the two blocks fits the data.
       Try to match the best straight line's loss from section 1. Then see whether you
       can go <em>below</em> it. Do it with ReLU blocks first, then switch to sigmoid.</li>
@@ -268,12 +268,12 @@ $$h_i = \phi(w_i x + b_i), \qquad \hat{y} = v_1 h_1 + v_2 h_2 + c$$
 </div>
 
 <ul id="sig-note" style="display:none;">
-  <li><b>Did you notice the parameter values?</b> To act like a straight line, sigmoid
+  <li><b>Did you notice the parameter values?</b> To look like a straight line, sigmoid
       blocks need extreme settings: a small $w$ and a very large $v$ (press fit and watch
-      $v$ climb almost to the edge of its slider range). That is because a sum of S-curves is
-      never exactly straight; it can only stretch its nearly-linear middle across the plot.</li>
-  <li>ReLU blocks needed no such tricks: they are piecewise-straight, so a line is
-      reproduced exactly with moderate parameter values, via $a x = a\,\text{ReLU}(x) - a\,\text{ReLU}(-x)$.</li>
+      $v$ climb almost to the edge of its slider range). That is because a sum of sigmoid curves
+      is never exactly straight; it can only stretch its nearly linear middle across the plot.</li>
+  <li>ReLU blocks needed nothing extreme: they are made of straight pieces, so a line is
+      matched exactly, via $a x = a\,\text{ReLU}(x) - a\,\text{ReLU}(-x)$.</li>
   <li>Takeaway: <b>the choice of activation decides what kind of pieces the network builds
       with</b>, and different pieces are good at different shapes.</li>
 </ul>
@@ -291,8 +291,8 @@ y_hat = v1 * h1 + v2 * h2 + c        # output: add the blocks
 loss  = np.mean((y_hat - y) ** 2)    # MSE, the loss you watched above
 </pre>
 <ul>
-  <li>And the same model in PyTorch. Note the one-to-one mapping between the lines of code
-      and the diagram above:</li>
+  <li>And the same model in PyTorch. Note how each line of code maps onto a piece of the
+      diagram above:</li>
 </ul>
 <pre>
 model = nn.Sequential(
@@ -316,8 +316,7 @@ model = nn.Sequential(
 <div class="spacer"></div>
 
 <footer>
-Next: <a href="chapter2.html" style="color:var(--orange);">Chapter 2: Non-linear Regression with Gradient Descent</a>. Companion notebooks with full derivations
-live in the same repository.
+Next: <a href="chapter2.html" style="color:var(--orange);">Chapter 2: Non-linear Regression with Gradient Descent</a>. The full notebooks with all the details are in the same repository.
 </footer>
 
 </main>
@@ -396,7 +395,7 @@ const DATA = (function () {
     for (let i = 0; i < N; i++){ const e = w*xd[i] + b - yd[i]; mse += e*e; }
     mse /= N;
     const isBest = Math.abs(w - wStar) < 0.03 && Math.abs(b - bStar) < 0.03;
-    $("ols-mse").innerHTML = mse.toFixed(3) + (isBest ? '  <span class="win">(the least-squares solution)</span>' : "");
+    $("ols-mse").innerHTML = mse.toFixed(3) + (isBest ? '  <span class="win">(the least squares solution)</span>' : "");
     Plotly.restyle("ols-fig", { y:[[w*xl[0]+b, w*xl[1]+b]] }, [1]);
     paintAll();
   }
