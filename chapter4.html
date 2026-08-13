@@ -274,7 +274,7 @@ $$z_k = w_{k1} x_1 + w_{k2} x_2 + b_k, \qquad p = \text{softmax}(z)$$
       accuracy a little above it. Recall chapter 2: on the points we trained on, fitting some
       of the noise is always possible. The recipe's numbers are the right target, not a
       record to beat.</li>
-  <li><b>(Optional) Question:</b> the logic behind softmax is that its inputs live in
+  <li><b>(Optional) Question:</b> the logic behind softmax is that its inputs are in
       log-space: it maps log-probabilities to probabilities. But our scores are just
       weighted sums of the point's coordinates. Nothing about
       $w_{k1} x_1 + w_{k2} x_2 + b_k$ says "log-probability", these are plain numbers built
