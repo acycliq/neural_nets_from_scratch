@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 4: Classification with Softmax</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+  :root {
+    --orange:#eb6834; --red:#c1121f; --green:#3a9d6e; --gold:#c8930c; --plum:#a94f86;
+    --surface:#fcfcfb; --grid:#e1e0d9; --axis:#c3c2b7;
+    --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface); color: var(--ink);
+    margin: 0; padding: 0 20px 80px; line-height: 1.6;
+  }
+  main { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 1.9em; margin: 55px 0 8px; }
+  h2 { font-size: 1.4em; margin: 64px 0 12px; }
+  p, li { color: var(--ink2); }
+  ul { padding-left: 22px; } li { margin: 5px 0; }
+  ol { padding-left: 22px; }
+  b, strong { color: var(--ink); }
+  .spacer { height: 26px; }
+  .panel {
+    background: #fff; border: 1px solid var(--grid); border-radius: 8px;
+    padding: 16px 18px 8px; margin: 18px 0;
+  }
+  .controls { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--ink2); }
+  .controls label { flex: 1; min-width: 170px; }
+  .controls b { color: var(--ink); }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%;
+    height: 7px; border-radius: 4px; background: var(--grid); margin: 8px 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--thumb, var(--ink2));
+    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--thumb, var(--ink2));
+    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
+  }
+  input[type=range]::-moz-range-track {
+    height: 5px; border-radius: 3px; background: var(--grid);
+  }
+  button {
+    font: inherit; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--axis); background: #fff; color: var(--ink2);
+  }
+  button:hover { border-color: var(--ink2); }
+  button.primary { background: var(--orange); border-color: var(--orange); color: #fff; }
+  .score { font-size: 14px; color: var(--ink2); margin: 8px 0; }
+  .score b { color: var(--ink); }
+  .win { color: var(--muted); }
+  pre {
+    background: #f6f5f2; border: 1px solid var(--grid); border-radius: 6px;
+    padding: 12px 14px; font-size: 12.5px; overflow-x: auto; line-height: 1.45;
+  }
+  .tabs { display: flex; gap: 8px; margin: 10px 0 0; }
+  table.count { border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+  table.count th, table.count td { border: 1px solid var(--grid); padding: 6px 14px; color: var(--ink2); }
+  table.count th { background: #f6f5f2; color: var(--ink); font-weight: 600; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 70px; }
+  a { color: var(--orange); }
+  nav.side {
+    display: none; position: fixed; top: 0; left: 0; bottom: 0; width: 235px;
+    padding: 30px 18px; border-right: 1px solid var(--grid);
+    background: #faf9f6; overflow-y: auto; font-size: 13.5px; line-height: 1.45;
+  }
+  nav.side .site {
+    display: block; font-weight: 700; color: var(--ink);
+    text-decoration: none; margin-bottom: 16px;
+  }
+  nav.side a { display: block; color: var(--ink2); text-decoration: none; padding: 4px 0; }
+  nav.side a:hover { color: var(--ink); }
+  nav.side a.here { color: var(--ink); font-weight: 600; }
+  nav.side .secs { margin: 2px 0 8px; }
+  nav.side .secs a { padding: 2px 0 2px 14px; font-size: 12.5px; color: var(--muted); }
+  nav.side .secs a:hover { color: var(--ink); }
+  @media (min-width: 1120px) {
+    nav.side { display: block; }
+    body { padding-left: 275px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Chapter 4: Classification with Softmax</h1>
+
+<div class="spacer"></div>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Recognize a <b>classification</b> problem: the target is a class, not a number</li>
+  <li>Explain how <b>softmax</b> turns a set of scores into probabilities</li>
+  <li>Explain why the loss for probabilities is <b>cross-entropy</b>, not MSE</li>
+  <li>Read a decision-region plot and the probability triangle</li>
+  <li>Build a curved decision boundary out of the same hidden nodes as before</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Motivation</h2>
+<ul>
+  <li>So far our networks predicted a <b>number</b>: for every $x$, a $\hat{y}$. But many
+      questions ask for a <b>choice</b>: which of three classes does this point belong to?</li>
+  <li>Note that the machine barely changes. The hidden layers are the lego blocks we already
+      know. What changes is the <b>output</b> (three scores instead of one number) and the
+      <b>loss</b> (a new way to measure being wrong).</li>
+  <li>The plan: meet the new data, meet softmax and cross-entropy, train the smallest
+      possible classifier, and watch it learn in two plots at once.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>1. From a Number to a Choice</h2>
+<ul>
+  <li>Our new data: each point has <b>two features</b> $(x_1, x_2)$, and a label that is one
+      of three classes. We generated the points from three overlapping clusters (one cluster
+      per class), so some points sit among points of a different class: <b>no boundary can get
+      everything right</b>, exactly like the noise in our regression chapters.</li>
+  <li>How do we write the target? Not as the number 1, 2, or 3 (class 3 is not "bigger" than
+      class 1). We use a <b>one-hot vector</b>: class 2 becomes $(0, 1, 0)$: all the
+      probability on class 2, none on the others.</li>
+  <li>So the network should output three numbers that behave like probabilities. That is the
+      job of the next section.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>2. Scores into Probabilities: Softmax</h2>
+<ul>
+  <li>The network's output layer now has <b>three nodes</b>, one score $z_k$ per class.
+      Scores can be any numbers at all. To turn them into probabilities we use
+      <b>softmax</b>:</li>
+</ul>
+
+$$p_k = \frac{e^{z_k}}{e^{z_1} + e^{z_2} + e^{z_3}}$$
+
+<ul>
+  <li>Three properties, all visible in the demo below:
+    <ol>
+      <li>every $p_k$ is positive and they sum to 1 (so they behave like probabilities);</li>
+      <li>the biggest score gets the biggest probability, and the bigger the gap between
+          scores, the more confident the result;</li>
+      <li>adding the same amount to every score changes nothing (press the button and watch
+          the bars stay put): only the <b>differences</b> between scores matter.</li>
+    </ol>
+  </li>
+</ul>
+
+<div class="panel">
+  <div class="controls">
+    <label>score $z_1$ <b id="sm-o-1"></b>
+      <input id="sm-z1" type="range" min="-4" max="4" step="0.1" value="1.5" style="--thumb:#c1121f;"></label>
+    <label>score $z_2$ <b id="sm-o-2"></b>
+      <input id="sm-z2" type="range" min="-4" max="4" step="0.1" value="0.5" style="--thumb:#3a9d6e;"></label>
+    <label>score $z_3$ <b id="sm-o-3"></b>
+      <input id="sm-z3" type="range" min="-4" max="4" step="0.1" value="-1" style="--thumb:#c8930c;"></label>
+  </div>
+  <div class="tabs"><button id="sm-shift">add +2 to every score</button></div>
+  <div id="sm-fig"></div>
+</div>
+
+<div class="spacer"></div>
+
+<h2>3. The Loss: Cross-Entropy</h2>
+<ul>
+  <li>We need a loss built for probabilities. The one used everywhere is
+      <b>cross-entropy</b>: look up the probability the model gave to the <b>true</b> class,
+      and take the negative log:</li>
+</ul>
+
+$$\mathcal{L} = -\log(p_{\text{true class}})$$
+
+<ul>
+  <li>Why not MSE on the probabilities? Because confidence should matter. Giving the true
+      class probability 0.01 is much worse than giving it 0.4, and cross-entropy makes the
+      difference count:</li>
+</ul>
+
+<table class="count">
+  <tr><th>probability given to the true class</th><th>loss $-\log(p)$</th></tr>
+  <tr><td>0.99</td><td>0.01</td></tr>
+  <tr><td>0.9</td><td>0.11</td></tr>
+  <tr><td>0.7</td><td>0.36</td></tr>
+  <tr><td>0.5</td><td>0.69</td></tr>
+  <tr><td>0.3</td><td>1.20</td></tr>
+  <tr><td>0.1</td><td>2.30</td></tr>
+  <tr><td>0.01</td><td>4.61</td></tr>
+</table>
+
+<ul>
+  <li>Start from the last row: giving the true class nearly all the probability costs almost
+      nothing, spreading the probability around costs a little, and being <b>confident about
+      the wrong class</b> costs a lot. The loss for the whole dataset is the average over
+      the points.</li>
+  <li>As in the regression chapters, we will compare the trained loss against the loss of the
+      <b>generating recipe</b> (the true cluster probabilities): with overlapping classes
+      even the perfect recipe cannot reach zero.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>4. Training a Linear Classifier</h2>
+<ul>
+  <li>The smallest possible classifier: each class scores a point with a plain linear
+      function, and softmax turns the three scores into probabilities.</li>
+</ul>
+
+$$z_k = w_{k1} x_1 + w_{k2} x_2 + b_k, \qquad p = \text{softmax}(z)$$
+
+<ul>
+  <li>Parameter count: 3 classes × (2 weights + 1 bias) = <b>9 parameters</b>. No hidden
+      layer at all: this is the classification version of chapter 1's linear regression.</li>
+  <li>Gradient descent adjusts the parameters to make the average cross-entropy small.
+      Two plots below, updated together:
+    <ul>
+      <li><b>Left, the map:</b> the data on its own ground, with the background colored by the
+          model's current choice in each region. The lines where the color changes are the
+          <b>decision boundaries</b>; for this linear model they are straight.</li>
+      <li><b>Right, the triangle:</b> every point drawn at its three predicted probabilities.
+          The corners are the certain answers, the center is complete uncertainty
+          $(\tfrac13, \tfrac13, \tfrac13)$. A trained point should sit near the corner of its
+          own color.</li>
+    </ul>
+  </li>
+  <li>Press <b>train</b> and watch both: the boundaries move into place on the map while the
+      points move out of the uncertain center toward their corners. Then drag the replay
+      slider. Points that sit <b>between two corners</b> are the ones in the overlap: the
+      model spreads its probability between two classes, and it should.</li>
+</ul>
+
+<div class="panel">
+  <div class="tabs">
+    <button id="qA-train" class="primary">train</button>
+    <button id="qA-reset">reset</button>
+  </div>
+  <div class="score">loss (cross-entropy): <b id="qA-ce"></b>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;accuracy: <b id="qA-acc"></b></span>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;epoch: <b id="qA-epoch">0</b></span>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;generating recipe: loss <b id="qA-floor"></b>, accuracy <b id="qA-bayes"></b></span></div>
+  <div class="score win" id="qA-win" style="min-height:1.6em; margin:-2px 0 6px;"></div>
+  <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
+    <input id="qA-replay" type="range" min="0" max="0" step="1" value="0" style="--thumb:#52514e;"></label>
+  <div style="display:flex; flex-wrap:wrap; gap:0;">
+    <div id="qA-map" style="flex:1 1 340px; min-width:300px;"></div>
+    <div id="qA-tri" style="flex:1 1 300px; min-width:280px;"></div>
+  </div>
+</div>
+
+<ul>
+  <li>The trained loss ends a little <b>below</b> the generating recipe's loss, and the
+      accuracy a little above it. Recall chapter 2: on the points we trained on, fitting some
+      of the noise is always possible. The recipe's numbers are the right target, not a
+      record to beat.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>5. A Curved Boundary Needs Hidden Nodes</h2>
+<ul>
+  <li>Straight boundaries are not always enough. In the data below, one class sits <b>inside
+      a ring</b> of another: no straight line separates them.</li>
+  <li>The answer is chapter 1's move, unchanged: put a hidden layer before the output. Each
+      hidden node is the same block as always, except its input is now a <b>direction in the
+      plane</b>: the node computes $\phi(w_1 x_1 + w_2 x_2 + b)$, a smooth step that turns on
+      across a line. Five such steps, combined by the output layer, can bend a boundary into
+      a loop.</li>
+  <li>Architecture 2 → 5 → 3: parameter count $5 \times 3 + 3 \times 6 = $ 15 + 18 =
+      <b>33 parameters</b> (each hidden node has 2 weights and 1 bias; each output node has
+      5 weights and 1 bias).</li>
+  <li>These classes do not overlap, so this time there is nothing to be uncertain about: the
+      loss can go all the way toward zero and the accuracy to 100%.</li>
+</ul>
+
+<div class="panel">
+  <div class="tabs">
+    <button id="qB-train" class="primary">train</button>
+    <button id="qB-reset">reset</button>
+  </div>
+  <div class="score">loss (cross-entropy): <b id="qB-ce"></b>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;accuracy: <b id="qB-acc"></b></span>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;epoch: <b id="qB-epoch">0</b></span></div>
+  <div class="score win" id="qB-win" style="min-height:1.6em; margin:-2px 0 6px;"></div>
+  <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
+    <input id="qB-replay" type="range" min="0" max="0" step="1" value="0" style="--thumb:#52514e;"></label>
+  <div style="display:flex; flex-wrap:wrap; gap:0;">
+    <div id="qB-map" style="flex:1 1 340px; min-width:300px;"></div>
+    <div id="qB-tri" style="flex:1 1 300px; min-width:280px;"></div>
+  </div>
+</div>
+
+<ul>
+  <li>Watch the replay closely: the boundary starts nearly straight, then bends, until it
+      forms a loop around the center class. The hidden nodes are doing for the boundary what
+      they did for curves in chapters 1 to 3: <b>building a shape out of simple steps</b>.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>(Optional) The Same Classifier in Code</h2>
+
+<p>The linear softmax classifier of section 4 in plain numpy (X has one row per point,
+y holds the class of each point as 0, 1 or 2):</p>
+
+<pre>import numpy as np
+
+def softmax(Z):
+    E = np.exp(Z - Z.max(axis=1, keepdims=True))
+    return E / E.sum(axis=1, keepdims=True)
+
+W = np.zeros((3, 2)); b = np.zeros(3)
+onehot = np.eye(3)[y]
+
+lr = 0.5
+n = len(y)
+for epoch in range(50_000):
+    P = softmax(X @ W.T + b)
+    G = (P - onehot) / n          # the gradient of cross-entropy through softmax
+    W -= lr * G.T @ X
+    b -= lr * G.sum(axis=0)
+
+loss = -np.mean(np.log(P[np.arange(n), y]))
+accuracy = np.mean(P.argmax(axis=1) == y)</pre>
+
+<ul>
+  <li>The line worth a close look: the gradient of cross-entropy through softmax is just
+      $p - y_{\text{one-hot}}$, the predicted probabilities minus the target ones. Predict,
+      compare, adjust, in its simplest form.</li>
+</ul>
+
+<p>In PyTorch:</p>
+
+<pre>import torch
+import torch.nn as nn
+
+model = nn.Linear(2, 3)                  # three scores from two features
+criterion = nn.CrossEntropyLoss()        # softmax + cross-entropy in one
+optimizer = torch.optim.SGD(model.parameters(), lr=0.5)
+
+for epoch in range(50_000):
+    loss = criterion(model(X), y)        # X: float features, y: class numbers
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()</pre>
+
+<ul>
+  <li>Note that <code>nn.CrossEntropyLoss</code> expects the <b>raw scores</b>, not
+      probabilities: it applies softmax itself. Passing it probabilities instead is a
+      common error.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Chapter Highlights</h2>
+<ol>
+  <li>Classification changes the output and the loss, not the machine: three scores instead
+      of one number, cross-entropy instead of MSE. The hidden layers are unchanged.</li>
+  <li>Softmax turns scores into probabilities: positive, summing to 1, and only the
+      differences between scores matter.</li>
+  <li>Cross-entropy reads the probability given to the true class and takes $-\log$:
+      being confident about the wrong class costs the most.</li>
+  <li>With overlapping classes, the generating recipe's loss and accuracy are the right
+      targets; a trained model that does better on the training points is fitting noise.</li>
+  <li>Straight boundaries come from linear scores (9 parameters here); curved boundaries
+      come from the same hidden blocks as always, now stepping across lines in the plane
+      (33 parameters here).</li>
+</ol>
+
+<footer>
+Previous: <a href="chapter3.html">Chapter 3: A Second Hidden Layer</a>.
+Next: how do we know the model still works on points it has never seen? That is generalization, and it gets its own chapter.
+</footer>
+
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const sig = z => 1/(1 + Math.exp(-z));
+const C = { orange:"#eb6834", red:"#c1121f", green:"#3a9d6e", gold:"#c8930c",
+            purple:"#8a63c4", muted:"#898781", surface:"#fcfcfb",
+            grid:"#e1e0d9", axis:"#c3c2b7", ink:"#0b0b0b", ink2:"#52514e" };
+const TINT = ["#f2d7d9", "#d9e9e0", "#f2e6c9"];
+const KCOL = [C.red, C.green, C.gold];
+const FONT = { family:'system-ui, -apple-system, "Segoe UI", sans-serif', color:C.ink2, size:12 };
+const CONF = {responsive:true, displayModeBar:false};
+
+function paintSlider(el) {
+  const min = +el.min, max = +el.max, v = +el.value;
+  const pct = (v - min) / (max - min) * 100;
+  const color = getComputedStyle(el).getPropertyValue("--thumb") || "#52514e";
+  el.style.background = `linear-gradient(to right, ${color} ${pct}%, var(--grid) ${pct}%)`;
+}
+function paintAll() { document.querySelectorAll("input[type=range]").forEach(paintSlider); }
+
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rnd = mulberry32(21);
+function gauss() {
+  let u = 0, v = 0;
+  while (!u) u = rnd();
+  while (!v) v = rnd();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+function softmax3(z) {
+  const m = Math.max(z[0], z[1], z[2]);
+  const e = [Math.exp(z[0]-m), Math.exp(z[1]-m), Math.exp(z[2]-m)];
+  const s = e[0] + e[1] + e[2];
+  return [e[0]/s, e[1]/s, e[2]/s];
+}
+
+/* ---- softmax demo -------------------------------------------------------- */
+Plotly.newPlot("sm-fig", [{
+  x:["p₁", "p₂", "p₃"], y:[0, 0, 0], type:"bar",
+  marker:{color:KCOL}, text:["", "", ""], textposition:"outside", hoverinfo:"skip",
+}], {
+  paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:230,
+  margin:{l:45, r:20, t:16, b:30}, showlegend:false,
+  xaxis:{tickfont:{size:13}}, yaxis:{range:[0, 1.08], gridcolor:C.grid, title:{text:"probability"}},
+}, CONF);
+function smRedraw() {
+  const z = [+$("sm-z1").value, +$("sm-z2").value, +$("sm-z3").value];
+  for (let k = 0; k < 3; k++) $("sm-o-" + (k+1)).textContent = z[k].toFixed(1);
+  const p = softmax3(z);
+  Plotly.restyle("sm-fig", {y: [p], text: [p.map(v => v.toFixed(2))]}, [0]);
+  paintAll();
+}
+["sm-z1", "sm-z2", "sm-z3"].forEach(id => $(id).addEventListener("input", smRedraw));
+$("sm-shift").addEventListener("click", () => {
+  ["sm-z1", "sm-z2", "sm-z3"].forEach(id => {
+    $(id).value = Math.min(4, +$(id).value + 2);
+  });
+  smRedraw();
+});
+smRedraw();
+
+/* ---- shared machinery ---------------------------------------------------- */
+function shouldSnap(e) {
+  if (e <= 100) return true;
+  if (e <= 1000) return e % 10 === 0;
+  if (e <= 10000) return e % 100 === 0;
+  return e % 2000 === 0;
+}
+function snapCount(maxe) {
+  let n = 0;
+  for (let e = 1; e <= maxe; e++) if (shouldSnap(e)) n++;
+  return n;
+}
+// triangle corners (equilateral): class 1 top, 2 left, 3 right
+const TRI = [[0, 1], [-0.866, -0.5], [0.866, -0.5]];
+function triFigure(div) {
+  const traces = [
+    { x:[TRI[0][0], TRI[1][0], TRI[2][0], TRI[0][0]],
+      y:[TRI[0][1], TRI[1][1], TRI[2][1], TRI[0][1]],
+      mode:"lines", line:{color:C.grid, width:1.5}, hoverinfo:"skip", showlegend:false },
+  ];
+  for (let k = 0; k < 3; k++)
+    traces.push({ x:[], y:[], mode:"markers", name:"class " + (k+1),
+      marker:{color:KCOL[k], size:6, opacity:0.8}, hoverinfo:"skip" });
+  Plotly.newPlot(div, traces, {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:330,
+    margin:{l:10, r:10, t:26, b:10}, showlegend:false,
+    xaxis:{visible:false, range:[-1.15, 1.15], fixedrange:true},
+    yaxis:{visible:false, range:[-0.75, 1.3], scaleanchor:"x", fixedrange:true},
+    annotations:[
+      {x:TRI[0][0], y:TRI[0][1] + 0.12, text:"class 1", showarrow:false, font:{color:KCOL[0], size:12}},
+      {x:TRI[1][0] - 0.02, y:TRI[1][1] - 0.12, text:"class 2", showarrow:false, font:{color:KCOL[1], size:12}},
+      {x:TRI[2][0] + 0.02, y:TRI[2][1] - 0.12, text:"class 3", showarrow:false, font:{color:KCOL[2], size:12}},
+      {x:0, y:1.28, text:"predicted probabilities (corners = certain)", showarrow:false, font:{color:C.muted, size:11}},
+    ],
+  }, CONF);
+}
+function triUpdate(div, probs, labels) {
+  const xs = [[], [], []], ys = [[], [], []];
+  for (let i = 0; i < probs.length; i++) {
+    const p = probs[i];
+    const x = p[0]*TRI[0][0] + p[1]*TRI[1][0] + p[2]*TRI[2][0];
+    const y = p[0]*TRI[0][1] + p[1]*TRI[1][1] + p[2]*TRI[2][1];
+    xs[labels[i]].push(x); ys[labels[i]].push(y);
+  }
+  Plotly.restyle(div, {x: xs, y: ys}, [1, 2, 3]);
+}
+function mapFigure(div, X, y, ex, ey, gridN) {
+  const gx = [], gy = [];
+  for (let i = 0; i < gridN; i++) {
+    gx.push(ex[0] + (ex[1]-ex[0])*i/(gridN-1));
+    gy.push(ey[0] + (ey[1]-ey[0])*i/(gridN-1));
+  }
+  const traces = [{
+    x:gx, y:gy, z:gy.map(() => gx.map(() => 0)), type:"heatmap", showscale:false,
+    colorscale:[[0, TINT[0]], [0.33, TINT[0]], [0.34, TINT[1]], [0.66, TINT[1]], [0.67, TINT[2]], [1, TINT[2]]],
+    zmin:0, zmax:2, hoverinfo:"skip",
+  }];
+  for (let k = 0; k < 3; k++)
+    traces.push({ x:X.filter((_, i) => y[i] === k).map(p => p[0]),
+      y:X.filter((_, i) => y[i] === k).map(p => p[1]),
+      mode:"markers", name:"class " + (k+1),
+      marker:{color:KCOL[k], size:6, line:{color:"#fff", width:0.8}},
+      hoverinfo:"skip" });
+  Plotly.newPlot(div, traces, {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:330,
+    margin:{l:40, r:10, t:26, b:34}, showlegend:true,
+    legend:{orientation:"h", x:0, y:1.09, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)"},
+    xaxis:{gridcolor:C.grid, zeroline:false, linecolor:C.axis, tickcolor:C.axis,
+           title:{text:"x₁"}, range:ex, fixedrange:true},
+    yaxis:{gridcolor:C.grid, zeroline:false, linecolor:C.axis, tickcolor:C.axis,
+           title:{text:"x₂"}, range:ey, fixedrange:true},
+  }, CONF);
+  return {gx, gy};
+}
+
+/* ---- panel A: blobs + linear softmax ------------------------------------- */
+(function panelA() {
+  const pre = "qA";
+  const MEANS = [[-2.4, 0.6], [1.5, 1.4], [1.0, -1.6]], SD = 1.15, NPC = 50;
+  const X = [], y = [];
+  for (let k = 0; k < 3; k++)
+    for (let i = 0; i < NPC; i++) {
+      X.push([MEANS[k][0] + SD*gauss(), MEANS[k][1] + SD*gauss()]);
+      y.push(k);
+    }
+  const N = X.length;
+  // the generating recipe's probabilities (equal priors, equal spread)
+  function truePost(p) {
+    const z = MEANS.map(m => -((p[0]-m[0])**2 + (p[1]-m[1])**2) / (2*SD*SD));
+    return softmax3(z);
+  }
+  let FLOOR = 0, BAYES = 0;
+  for (let i = 0; i < N; i++) {
+    const p = truePost(X[i]);
+    FLOOR += -Math.log(p[y[i]] + 1e-12);
+    if (p.indexOf(Math.max(...p)) === y[i]) BAYES++;
+  }
+  FLOOR /= N; BAYES /= N;
+
+  const MAXE = 50000, SNAPS = snapCount(MAXE);
+  let W = [[0,0],[0,0],[0,0]], b = [0,0,0], epoch = 0, training = false, hist = [];
+
+  const {gx, gy} = mapFigure(pre + "-map", X, y, [-6, 5.2], [-4.6, 4.6], 55);
+  triFigure(pre + "-tri");
+
+  const scores = p => softmax3([W[0][0]*p[0] + W[0][1]*p[1] + b[0],
+                                W[1][0]*p[0] + W[1][1]*p[1] + b[1],
+                                W[2][0]*p[0] + W[2][1]*p[1] + b[2]]);
+  function metrics() {
+    let ce = 0, acc = 0;
+    for (let i = 0; i < N; i++) {
+      const p = scores(X[i]);
+      ce += -Math.log(p[y[i]] + 1e-12);
+      if (p.indexOf(Math.max(...p)) === y[i]) acc++;
+    }
+    return [ce/N, acc/N];
+  }
+  function redraw() {
+    const [ce, acc] = metrics();
+    const z = gy.map(yy => gx.map(xx => {
+      const p = scores([xx, yy]);
+      return p.indexOf(Math.max(...p));
+    }));
+    Plotly.restyle(pre + "-map", {z: [z]}, [0]);
+    triUpdate(pre + "-tri", X.map(scores), y);
+    $(pre + "-ce").textContent = ce.toFixed(4);
+    $(pre + "-acc").textContent = (100*acc).toFixed(1) + "%";
+    $(pre + "-epoch").textContent = epoch;
+    $(pre + "-win").textContent =
+      ce < FLOOR - 0.003 ? "(even lower than the generating recipe: the boundary is fitting some of the noise too!)"
+      : Math.abs(ce - FLOOR) <= 0.003 ? "(as low as the overlap allows!)" : "";
+  }
+  function gdSteps(n) {
+    const LR = 0.5;
+    for (let t = 0; t < n; t++) {
+      const gW = [[0,0],[0,0],[0,0]], gb = [0,0,0];
+      for (let i = 0; i < N; i++) {
+        const p = scores(X[i]);
+        for (let k = 0; k < 3; k++) {
+          const g = (p[k] - (y[i] === k ? 1 : 0)) / N;
+          gW[k][0] += g*X[i][0]; gW[k][1] += g*X[i][1]; gb[k] += g;
+        }
+      }
+      for (let k = 0; k < 3; k++) {
+        W[k][0] -= LR*gW[k][0]; W[k][1] -= LR*gW[k][1]; b[k] -= LR*gb[k];
+      }
+      epoch++;
+      if (shouldSnap(epoch)) hist.push(snap());
+    }
+  }
+  const snap = () => ({e: epoch, W: W.map(r => r.slice()), b: b.slice()});
+  function restore(h) { epoch = h.e; W = h.W.map(r => r.slice()); b = h.b.slice(); }
+  function histReset() {
+    hist = [snap()];
+    $(pre + "-replay").max = SNAPS;
+    $(pre + "-replay").value = 0;
+    paintSlider($(pre + "-replay"));
+  }
+  function trainLoop() {
+    if (!training) return;
+    const chunk = epoch < 100 ? 2 : epoch < 1000 ? 25 : epoch < 10000 ? 250 : 2000;
+    gdSteps(Math.min(chunk, MAXE - epoch));
+    $(pre + "-replay").value = hist.length - 1;
+    paintSlider($(pre + "-replay"));
+    redraw();
+    if (epoch >= MAXE) { training = false; $(pre + "-train").textContent = "train"; return; }
+    requestAnimationFrame(trainLoop);
+  }
+  $(pre + "-train").addEventListener("click", () => {
+    if (!training) hist = hist.slice(0, Math.min(+$(pre + "-replay").value + 1, hist.length));
+    training = !training;
+    $(pre + "-train").textContent = training ? "pause" : "train";
+    if (training) requestAnimationFrame(trainLoop);
+  });
+  $(pre + "-reset").addEventListener("click", () => {
+    training = false; $(pre + "-train").textContent = "train";
+    epoch = 0; W = [[0,0],[0,0],[0,0]]; b = [0,0,0];
+    histReset(); redraw();
+  });
+  $(pre + "-replay").addEventListener("input", () => {
+    training = false; $(pre + "-train").textContent = "train";
+    const i = Math.min(+$(pre + "-replay").value, hist.length - 1);
+    $(pre + "-replay").value = i;
+    paintSlider($(pre + "-replay"));
+    restore(hist[i]); redraw();
+  });
+  $(pre + "-floor").textContent = FLOOR.toFixed(4);
+  $(pre + "-bayes").textContent = (100*BAYES).toFixed(1) + "%";
+  histReset(); redraw();
+})();
+
+/* ---- panel B: disk / ring / blob + hidden layer -------------------------- */
+(function panelB() {
+  const pre = "qB";
+  const NB = 60, X = [], y = [];
+  for (let i = 0; i < NB; i++) {              // class 1: disk
+    const r = 1.1*rnd(), a = 2*Math.PI*rnd();
+    X.push([r*Math.cos(a), r*Math.sin(a)]); y.push(0);
+  }
+  for (let i = 0; i < NB; i++) {              // class 2: ring
+    const r = 2.0 + 1.0*rnd(), a = 2*Math.PI*rnd();
+    X.push([r*Math.cos(a), r*Math.sin(a)]); y.push(1);
+  }
+  for (let i = 0; i < NB; i++) {              // class 3: far cluster
+    X.push([4.6 + 0.7*gauss(), 3.6 + 0.7*gauss()]); y.push(2);
+  }
+  const N = X.length, H = 5;
+  const INIT = {
+    W1: [[1,0],[0,1],[-1,0],[0,-1],[0.7,0.7]],
+    b1: [-1,-1,-1,-1,1],
+    W2: [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]],
+    b2: [0,0,0],
+  };
+  let P = JSON.parse(JSON.stringify(INIT));
+  const MAXE = 100000, SNAPS = snapCount(MAXE);
+  let epoch = 0, training = false, hist = [];
+
+  const {gx, gy} = mapFigure(pre + "-map", X, y, [-3.6, 6.4], [-3.6, 5.6], 55);
+  triFigure(pre + "-tri");
+
+  function fwd(p) {
+    const h = [];
+    for (let j = 0; j < H; j++) h.push(sig(P.W1[j][0]*p[0] + P.W1[j][1]*p[1] + P.b1[j]));
+    const z = [0, 1, 2].map(k => {
+      let s = P.b2[k];
+      for (let j = 0; j < H; j++) s += P.W2[k][j]*h[j];
+      return s;
+    });
+    return [h, softmax3(z)];
+  }
+  function metrics() {
+    let ce = 0, acc = 0;
+    for (let i = 0; i < N; i++) {
+      const [, p] = fwd(X[i]);
+      ce += -Math.log(p[y[i]] + 1e-12);
+      if (p.indexOf(Math.max(...p)) === y[i]) acc++;
+    }
+    return [ce/N, acc/N];
+  }
+  function redraw() {
+    const [ce, acc] = metrics();
+    const z = gy.map(yy => gx.map(xx => {
+      const [, p] = fwd([xx, yy]);
+      return p.indexOf(Math.max(...p));
+    }));
+    Plotly.restyle(pre + "-map", {z: [z]}, [0]);
+    triUpdate(pre + "-tri", X.map(pt => fwd(pt)[1]), y);
+    $(pre + "-ce").textContent = ce.toFixed(4);
+    $(pre + "-acc").textContent = (100*acc).toFixed(1) + "%";
+    $(pre + "-epoch").textContent = epoch;
+    $(pre + "-win").textContent =
+      (acc === 1 && ce < 0.02) ? "(every point on the correct side: with no overlap the loss can go all the way toward zero)" : "";
+  }
+  function gdSteps(n) {
+    const LR = 0.5;
+    for (let t = 0; t < n; t++) {
+      const gW1 = P.W1.map(() => [0,0]), gb1 = Array(H).fill(0);
+      const gW2 = P.W2.map(() => Array(H).fill(0)), gb2 = [0,0,0];
+      for (let i = 0; i < N; i++) {
+        const [h, p] = fwd(X[i]);
+        const d2 = [0, 1, 2].map(k => (p[k] - (y[i] === k ? 1 : 0)) / N);
+        for (let k = 0; k < 3; k++) {
+          gb2[k] += d2[k];
+          for (let j = 0; j < H; j++) gW2[k][j] += d2[k]*h[j];
+        }
+        for (let j = 0; j < H; j++) {
+          let dh = 0;
+          for (let k = 0; k < 3; k++) dh += d2[k]*P.W2[k][j];
+          const d1 = dh*h[j]*(1 - h[j]);
+          gW1[j][0] += d1*X[i][0]; gW1[j][1] += d1*X[i][1]; gb1[j] += d1;
+        }
+      }
+      for (let j = 0; j < H; j++) {
+        P.W1[j][0] -= LR*gW1[j][0]; P.W1[j][1] -= LR*gW1[j][1]; P.b1[j] -= LR*gb1[j];
+      }
+      for (let k = 0; k < 3; k++) {
+        P.b2[k] -= LR*gb2[k];
+        for (let j = 0; j < H; j++) P.W2[k][j] -= LR*gW2[k][j];
+      }
+      epoch++;
+      if (shouldSnap(epoch)) hist.push(snap());
+    }
+  }
+  const snap = () => JSON.parse(JSON.stringify({e: epoch, P}));
+  function restore(h) { epoch = h.e; P = JSON.parse(JSON.stringify(h.P)); }
+  function histReset() {
+    hist = [snap()];
+    $(pre + "-replay").max = SNAPS;
+    $(pre + "-replay").value = 0;
+    paintSlider($(pre + "-replay"));
+  }
+  function trainLoop() {
+    if (!training) return;
+    const chunk = epoch < 100 ? 2 : epoch < 1000 ? 25 : epoch < 10000 ? 250 : 2000;
+    gdSteps(Math.min(chunk, MAXE - epoch));
+    $(pre + "-replay").value = hist.length - 1;
+    paintSlider($(pre + "-replay"));
+    redraw();
+    if (epoch >= MAXE) { training = false; $(pre + "-train").textContent = "train"; return; }
+    requestAnimationFrame(trainLoop);
+  }
+  $(pre + "-train").addEventListener("click", () => {
+    if (!training) hist = hist.slice(0, Math.min(+$(pre + "-replay").value + 1, hist.length));
+    training = !training;
+    $(pre + "-train").textContent = training ? "pause" : "train";
+    if (training) requestAnimationFrame(trainLoop);
+  });
+  $(pre + "-reset").addEventListener("click", () => {
+    training = false; $(pre + "-train").textContent = "train";
+    epoch = 0; P = JSON.parse(JSON.stringify(INIT));
+    histReset(); redraw();
+  });
+  $(pre + "-replay").addEventListener("input", () => {
+    training = false; $(pre + "-train").textContent = "train";
+    const i = Math.min(+$(pre + "-replay").value, hist.length - 1);
+    $(pre + "-replay").value = i;
+    paintSlider($(pre + "-replay"));
+    restore(hist[i]); redraw();
+  });
+  histReset(); redraw();
+})();
+paintAll();
+</script>
+<nav class="side" id="sidenav"></nav>
+<script>
+(function () {
+  const chapters = [
+    ["index.html", "Chapter 1: Neural Networks, One Lego Block at a Time"],
+    ["chapter2.html", "Chapter 2: Non-linear Regression with Gradient Descent"],
+    ["chapter3.html", "Chapter 3: A Second Hidden Layer"],
+    ["chapter4.html", "Chapter 4: Classification with Softmax"],
+  ];
+  const here = location.pathname.split("/").pop() || "index.html";
+  let nav = '<a class="site" href="index.html">Neural nets from scratch</a>';
+  for (const [page, title] of chapters) {
+    const on = page === here;
+    nav += `<a href="${page}"${on ? ' class="here"' : ""}>${title}</a>`;
+    if (on) {
+      nav += '<div class="secs">';
+      document.querySelectorAll("main h2").forEach((h, i) => {
+        if (!h.id) h.id = "sec" + i;
+        nav += `<a href="#${h.id}">${h.textContent}</a>`;
+      });
+      nav += "</div>";
+    }
+  }
+  document.getElementById("sidenav").innerHTML = nav;
+})();
+</script>
+</body>
+</html>
