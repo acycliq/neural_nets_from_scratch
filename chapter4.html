@@ -173,7 +173,7 @@ $$p_k = \frac{e^{z_k}}{e^{z_1} + e^{z_2} + e^{z_3}}$$
     <label>score $z_3$ <b id="sm-o-3"></b>
       <input id="sm-z3" type="range" min="-4" max="4" step="0.1" value="-1" style="--thumb:#c8930c;"></label>
   </div>
-  <div class="tabs"><button id="sm-shift">add +2 to every score</button></div>
+  <div class="tabs"><button id="sm-shift">shift every score by the same amount</button></div>
   <div id="sm-fig"></div>
 </div>
 
@@ -479,9 +479,11 @@ function smRedraw() {
 }
 ["sm-z1", "sm-z2", "sm-z3"].forEach(id => $(id).addEventListener("input", smRedraw));
 $("sm-shift").addEventListener("click", () => {
-  ["sm-z1", "sm-z2", "sm-z3"].forEach(id => {
-    $(id).value = Math.min(4, +$(id).value + 2);
-  });
+  // the shift must be the SAME for all three, or the invariance demo lies:
+  // go +2 when there is room, otherwise -2; never clamp per-slider
+  const zs = ["sm-z1", "sm-z2", "sm-z3"].map(id => +$(id).value);
+  const d = Math.max(...zs) + 2 <= 4 ? 2 : Math.min(...zs) - 2 >= -4 ? -2 : 0;
+  ["sm-z1", "sm-z2", "sm-z3"].forEach((id, i) => { $(id).value = zs[i] + d; });
   smRedraw();
 });
 smRedraw();
