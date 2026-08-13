@@ -397,13 +397,8 @@ function makeData() {
   FLOOR /= N;
 }
 makeData();
-const NX = 400, xg = [], tg = [];
-for (let i = 0; i < NX; i++) {
-  const x = -6 + 12*i/(NX-1);
-  let y = SEC.c;
-  for (let j = 0; j < 3; j++) y += SEC.v[j] * sig(SEC.w[j]*(x - SEC.l[j]));
-  xg.push(x); tg.push(y);
-}
+const NX = 400, xg = [];
+for (let i = 0; i < NX; i++) xg.push(-6 + 12*i/(NX-1));
 
 /* ---- model state (raw parameters; sliders mirror them) ---------------- */
 const INIT = { l:[-3, 0, 3], w:[1, 1, 1], v:[0.3, -0.3, 0.3] };
