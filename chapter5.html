@@ -4,92 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Chapter 5: Generalization</title>
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+<meta name="description" content="Hold points back and measure honestly: watch a big network overfit, overfit by hand yourself, and map flexibility against test loss.">
+<meta property="og:title" content="Chapter 5: Generalization">
+<meta property="og:description" content="Hold points back and measure honestly: watch a big network overfit, overfit by hand yourself, and map flexibility against test loss.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://acycliq.github.io/neural_nets_from_scratch/chapter5.html">
+<meta property="og:image" content="https://acycliq.github.io/neural_nets_from_scratch/assets/demo.gif">
+<meta name="twitter:card" content="summary_large_image">
+<script src="https://cdn.plot.ly/plotly-cartesian-2.35.2.min.js" integrity="sha384-gKF7EaMDoWW1zLWkouldmVWF5jqEKrAswAciW73iNzqlomabVVPO60XkJvL5q/Ie" crossorigin="anonymous"></script>
 <script>
 window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
-<style>
-  :root {
-    --orange:#eb6834; --red:#c1121f; --green:#3a9d6e; --gold:#c8930c; --plum:#a94f86;
-    --surface:#fcfcfb; --grid:#e1e0d9; --axis:#c3c2b7;
-    --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
-  }
-  * { box-sizing: border-box; }
-  body {
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    background: var(--surface); color: var(--ink);
-    margin: 0; padding: 0 20px 80px; line-height: 1.6;
-  }
-  main { max-width: 800px; margin: 0 auto; }
-  h1 { font-size: 1.9em; margin: 55px 0 8px; }
-  h2 { font-size: 1.4em; margin: 64px 0 12px; }
-  p, li { color: var(--ink2); }
-  ul { padding-left: 22px; } li { margin: 5px 0; }
-  ol { padding-left: 22px; }
-  b, strong { color: var(--ink); }
-  .spacer { height: 26px; }
-  .panel {
-    background: #fff; border: 1px solid var(--grid); border-radius: 8px;
-    padding: 16px 18px 8px; margin: 18px 0;
-  }
-  input[type=range] {
-    -webkit-appearance: none; appearance: none; width: 100%;
-    height: 7px; border-radius: 4px; background: var(--grid); margin: 8px 0;
-  }
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
-    border-radius: 50%; background: var(--thumb, var(--ink2));
-    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
-  }
-  input[type=range]::-moz-range-thumb {
-    width: 13px; height: 13px; border-radius: 50%;
-    background: var(--thumb, var(--ink2));
-    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
-  }
-  input[type=range]::-moz-range-track {
-    height: 5px; border-radius: 3px; background: var(--grid);
-  }
-  button {
-    font: inherit; padding: 7px 14px; border-radius: 6px; cursor: pointer;
-    border: 1px solid var(--axis); background: #fff; color: var(--ink2);
-  }
-  button:hover { border-color: var(--ink2); }
-  button.primary { background: var(--orange); border-color: var(--orange); color: #fff; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  .score { font-size: 14px; color: var(--ink2); margin: 8px 0; }
-  .score b { color: var(--ink); }
-  .win { color: var(--muted); }
-  pre {
-    background: #f6f5f2; border: 1px solid var(--grid); border-radius: 6px;
-    padding: 12px 14px; font-size: 12.5px; overflow-x: auto; line-height: 1.45;
-  }
-  .tabs { display: flex; gap: 8px; margin: 10px 0 0; }
-  footer { color: var(--muted); font-size: 13px; margin-top: 70px; }
-  a { color: var(--orange); }
-  nav.side {
-    display: none; position: fixed; top: 0; left: 0; bottom: 0; width: 235px;
-    padding: 30px 18px; border-right: 1px solid var(--grid);
-    background: #faf9f6; overflow-y: auto; font-size: 13.5px; line-height: 1.45;
-  }
-  nav.side .site {
-    display: block; font-weight: 700; color: var(--ink);
-    text-decoration: none; margin-bottom: 16px;
-  }
-  nav.side a { display: block; color: var(--ink2); text-decoration: none; padding: 4px 0; }
-  nav.side a:hover { color: var(--ink); }
-  nav.side a.here { color: var(--ink); font-weight: 600; }
-  nav.side .secs { margin: 2px 0 8px; }
-  nav.side .secs a { padding: 2px 0 2px 14px; font-size: 12.5px; color: var(--muted); }
-  nav.side .secs a:hover { color: var(--ink); }
-  @media (min-width: 1120px) {
-    nav.side { display: block; }
-    body { padding-left: 275px; }
-  }
-</style>
+<link rel="stylesheet" href="site.css">
 </head>
 <body>
 <main>
+<noscript><p>The interactive panels on this page need JavaScript. The text still reads without it, but the plots and buttons stay empty.</p></noscript>
 
 <h1>Chapter 5: Generalization</h1>
 
@@ -549,6 +481,7 @@ function netCurve(P) {
            range:[-2.2, 2.6], fixedrange:true},
   }, CONF);
   $(pre + "-fig").style.cursor = "crosshair";
+  $(pre + "-fig").style.touchAction = "none";
 
   let drawing = false, lastIdx = null, lastY = null, revealed = false;
   function sketchAt(e) {
@@ -690,31 +623,6 @@ function netCurve(P) {
 })();
 </script>
 <nav class="side" id="sidenav"></nav>
-<script>
-(function () {
-  const chapters = [
-    ["index.html", "Chapter 1: Neural Networks, One Lego Block at a Time"],
-    ["chapter2.html", "Chapter 2: Non-linear Regression with Gradient Descent"],
-    ["chapter3.html", "Chapter 3: A Second Hidden Layer"],
-    ["chapter4.html", "Chapter 4: Classification with Softmax"],
-    ["chapter5.html", "Chapter 5: Generalization"],
-  ];
-  const here = location.pathname.split("/").pop() || "index.html";
-  let nav = '<a class="site" href="index.html">Neural nets from scratch</a>';
-  for (const [page, title] of chapters) {
-    const on = page === here;
-    nav += `<a href="${page}"${on ? ' class="here"' : ""}>${title}</a>`;
-    if (on) {
-      nav += '<div class="secs">';
-      document.querySelectorAll("main h2").forEach((h, i) => {
-        if (!h.id) h.id = "sec" + i;
-        nav += `<a href="#${h.id}">${h.textContent}</a>`;
-      });
-      nav += "</div>";
-    }
-  }
-  document.getElementById("sidenav").innerHTML = nav;
-})();
-</script>
+<script src="nav.js"></script>
 </body>
 </html>
