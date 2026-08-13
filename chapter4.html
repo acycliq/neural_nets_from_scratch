@@ -277,7 +277,7 @@ $$z_k = w_{k1} x_1 + w_{k2} x_2 + b_k, \qquad p = \text{softmax}(z)$$
   <li><b>(Optional) Question:</b> the logic behind softmax is that its inputs are in
       log-space: it maps log-probabilities to probabilities. But our scores are just
       weighted sums of the point's coordinates. Nothing about
-      $w_{k1} x_1 + w_{k2} x_2 + b_k$ says "log-probability", these are plain numbers built
+      $w_{k1} x_1 + w_{k2} x_2 + b_k$ says "log-probability"; these are plain numbers built
       from plain coordinates. What gives us the right to put them through softmax?</li>
   <li><b>Answer:</b> using softmax <em>is</em> the claim. The model does not discover that
       the scores are log-probabilities; it <em>declares</em> them to be:
