@@ -224,6 +224,10 @@ $$z_k = w_{k1} x_1 + w_{k2} x_2 + b_k, \qquad p = \text{softmax}(z)$$
 <ul>
   <li>Parameter count: 3 classes × (2 weights + 1 bias) = <b>9 parameters</b>. No hidden
       layer at all: this is the classification version of chapter 1's linear regression.</li>
+  <li>The diagram in the panel is the machine itself: the two features and the constant 1
+      feed three score nodes (colored by class), and the shared softmax box turns the three
+      scores into probabilities. The numbers on the connections are the 9 parameters, and
+      they update as training runs.</li>
   <li>Gradient descent adjusts the parameters to make the average cross-entropy small.
       Two plots below, updated together:
     <ul>
@@ -254,6 +258,7 @@ $$z_k = w_{k1} x_1 + w_{k2} x_2 + b_k, \qquad p = \text{softmax}(z)$$
   <div class="score win" id="qA-win" style="min-height:1.6em; margin:-2px 0 6px;"></div>
   <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
     <input id="qA-replay" type="range" min="0" max="0" step="1" value="0" style="--thumb:#52514e;"></label>
+  <div id="qA-wire"></div>
   <div style="display:flex; flex-wrap:wrap; gap:0;">
     <div id="qA-map" style="flex:1 1 340px; min-width:300px;"></div>
     <div id="qA-tri" style="flex:1 1 300px; min-width:280px;"></div>
@@ -283,6 +288,9 @@ $$z_k = w_{k1} x_1 + w_{k2} x_2 + b_k, \qquad p = \text{softmax}(z)$$
       5 weights and 1 bias).</li>
   <li>These classes do not overlap, so this time there is nothing to be uncertain about: the
       loss can go all the way toward zero and the accuracy to 100%.</li>
+  <li>With 33 parameters, printing every value on the diagram would be too much. Instead all
+      connections share one color, and the <b>thickness of a line follows the size of its
+      weight</b> as training runs. Put the mouse on a line to see its exact value.</li>
 </ul>
 
 <div class="panel">
@@ -296,6 +304,7 @@ $$z_k = w_{k1} x_1 + w_{k2} x_2 + b_k, \qquad p = \text{softmax}(z)$$
   <div class="score win" id="qB-win" style="min-height:1.6em; margin:-2px 0 6px;"></div>
   <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
     <input id="qB-replay" type="range" min="0" max="0" step="1" value="0" style="--thumb:#52514e;"></label>
+  <div id="qB-wire"></div>
   <div style="display:flex; flex-wrap:wrap; gap:0;">
     <div id="qB-map" style="flex:1 1 340px; min-width:300px;"></div>
     <div id="qB-tri" style="flex:1 1 300px; min-width:280px;"></div>
@@ -390,7 +399,7 @@ Next: how do we know the model still works on points it has never seen? That is 
 const $ = id => document.getElementById(id);
 const sig = z => 1/(1 + Math.exp(-z));
 const C = { orange:"#eb6834", red:"#c1121f", green:"#3a9d6e", gold:"#c8930c",
-            purple:"#8a63c4", muted:"#898781", surface:"#fcfcfb",
+            purple:"#8a63c4", blue:"#2a78d6", muted:"#898781", surface:"#fcfcfb",
             grid:"#e1e0d9", axis:"#c3c2b7", ink:"#0b0b0b", ink2:"#52514e" };
 const TINT = ["#f2d7d9", "#d9e9e0", "#f2e6c9"];
 const KCOL = [C.red, C.green, C.gold];
@@ -557,6 +566,58 @@ function mapFigure(div, X, y, ex, ey, gridN) {
   const {gx, gy} = mapFigure(pre + "-map", X, y, [-6, 5.2], [-4.6, 4.6], 55);
   triFigure(pre + "-tri");
 
+  /* wiring diagram: x1, x2, 1 -> three score nodes -> softmax -> p */
+  const AXI = 0.25, AXS = 2.0, BOXL = 2.75, BOXR = 3.85;
+  const YIN = [1.3, 0, -1.3], YS = [1.2, 0, -1.2];
+  const wire = [];
+  for (let k = 0; k < 3; k++) {
+    wire.push({x:[AXI, AXS], y:[YIN[0], YS[k]], mode:"lines", showlegend:false,
+      line:{color:C.orange, width:2.2}, hovertemplate:`weight: x₁ → class ${k+1} score<extra></extra>`});
+    wire.push({x:[AXI, AXS], y:[YIN[1], YS[k]], mode:"lines", showlegend:false,
+      line:{color:C.orange, width:2.2}, hovertemplate:`weight: x₂ → class ${k+1} score<extra></extra>`});
+    wire.push({x:[AXI, AXS], y:[YIN[2], YS[k]], mode:"lines", showlegend:false,
+      line:{color:C.axis, width:1.5}, hovertemplate:`bias of the class ${k+1} score<extra></extra>`});
+    wire.push({x:[AXS + 0.16, BOXL], y:[YS[k], YS[k]], mode:"lines", showlegend:false,
+      line:{color:C.axis, width:1.6}, hoverinfo:"skip"});
+  }
+  const aNode = (x, y, color, text, tip) => wire.push({x:[x], y:[y], mode:"markers+text",
+    text:[text], textposition:"middle center", textfont:{color:"#fff", size:12},
+    showlegend:false, marker:{size:32, color, line:{color:C.surface, width:2}},
+    hovertemplate: tip ? tip + "<extra></extra>" : undefined, hoverinfo: tip ? undefined : "skip"});
+  aNode(AXI, YIN[0], C.blue, "x₁", "feature 1");
+  aNode(AXI, YIN[1], C.blue, "x₂", "feature 2");
+  aNode(AXI, YIN[2], C.muted, "1", "constant input");
+  for (let k = 0; k < 3; k++) aNode(AXS, YS[k], KCOL[k], "Σ", `class ${k+1} score (a weighted sum)`);
+  const aBase = [
+    {x:(BOXL + BOXR)/2, y:0, xref:"x", yref:"y", text:"softmax", showarrow:false, font:{color:C.ink2, size:13}},
+    ...[0,1,2].map(k => ({x:BOXR + 0.75, y:YS[k], ax:BOXR + 0.08, ay:YS[k], xref:"x", yref:"y",
+       axref:"x", ayref:"y", showarrow:true, arrowhead:3, arrowsize:1.1, arrowwidth:1.5, arrowcolor:C.axis})),
+    ...[0,1,2].map(k => ({x:BOXR + 0.98, y:YS[k], xref:"x", yref:"y", text:"p" + "₁₂₃"[k],
+       showarrow:false, font:{color:KCOL[k], size:14}})),
+  ];
+  Plotly.newPlot(pre + "-wire", wire, {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:230,
+    margin:{l:10, r:10, t:6, b:6}, showlegend:false,
+    xaxis:{visible:false, range:[-0.3, 5.3]}, yaxis:{visible:false, range:[-1.95, 1.95]},
+    shapes:[{type:"rect", x0:BOXL, x1:BOXR, y0:-1.7, y1:1.7,
+             line:{color:C.axis, width:1.2}, fillcolor:"#f6f5f2", layer:"below"}],
+    annotations:aBase,
+    hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+  }, CONF);
+  const chipA = (x, y, text, color) => ({xref:"x", yref:"y", x, y, text, showarrow:false,
+      bgcolor:C.surface, borderpad:1, opacity:0.92, font:{size:10, color}});
+  const fmt = t => (t >= 0 ? "+" : "") + t.toFixed(2);
+  function chips() {
+    const a = [...aBase];
+    const mid = (y1, y2, f) => [AXI + (AXS - AXI)*f, y1 + (y2 - y1)*f];
+    for (let k = 0; k < 3; k++) {
+      let p = mid(YIN[0], YS[k], 0.30); a.push(chipA(p[0], p[1] + 0.15, fmt(W[k][0]), C.orange));
+      p = mid(YIN[1], YS[k], 0.55); a.push(chipA(p[0], p[1] + 0.15, fmt(W[k][1]), C.orange));
+      p = mid(YIN[2], YS[k], 0.78); a.push(chipA(p[0], p[1] + 0.15, fmt(b[k]), C.muted));
+    }
+    return a;
+  }
+
   const scores = p => softmax3([W[0][0]*p[0] + W[0][1]*p[1] + b[0],
                                 W[1][0]*p[0] + W[1][1]*p[1] + b[1],
                                 W[2][0]*p[0] + W[2][1]*p[1] + b[2]]);
@@ -577,6 +638,7 @@ function mapFigure(div, X, y, ex, ey, gridN) {
     }));
     Plotly.restyle(pre + "-map", {z: [z]}, [0]);
     triUpdate(pre + "-tri", X.map(scores), y);
+    Plotly.relayout(pre + "-wire", {annotations: chips()});
     $(pre + "-ce").textContent = ce.toFixed(4);
     $(pre + "-acc").textContent = (100*acc).toFixed(1) + "%";
     $(pre + "-epoch").textContent = epoch;
@@ -672,6 +734,76 @@ function mapFigure(div, X, y, ex, ey, gridN) {
   const {gx, gy} = mapFigure(pre + "-map", X, y, [-3.6, 6.4], [-3.6, 5.6], 55);
   triFigure(pre + "-tri");
 
+  /* wiring diagram: one color for every connection; thickness follows the weight */
+  const BXI = 0.25, BXH = 2.0, BXS = 3.7, BBL = 4.35, BBR = 5.45;
+  const BYIN = [1.2, -1.2], BYH = [2.2, 1.1, 0, -1.1, -2.2], BYS = [1.4, 0, -1.4];
+  const wireB = [], edgeNames = [];
+  const bEdge = (x1, y1, x2, y2, name) => {
+    wireB.push({x:[x1, x2], y:[y1, y2], mode:"lines", showlegend:false,
+      line:{color:C.axis, width:1}, hovertemplate:"<extra></extra>"});
+    edgeNames.push(name);
+  };
+  for (let j = 0; j < H; j++) {
+    bEdge(BXI, BYIN[0], BXH, BYH[j], `x₁ → hidden ${j+1}`);
+    bEdge(BXI, BYIN[1], BXH, BYH[j], `x₂ → hidden ${j+1}`);
+    bEdge(BXI, -2.9, BXH, BYH[j], `bias of hidden ${j+1}`);
+  }
+  for (let k = 0; k < 3; k++) {
+    for (let j = 0; j < H; j++) bEdge(BXH, BYH[j], BXS, BYS[k], `hidden ${j+1} → class ${k+1} score`);
+    bEdge(BXH, -3.3, BXS, BYS[k], `bias of the class ${k+1} score`);
+  }
+  const NEDGE = wireB.length;
+  for (let k = 0; k < 3; k++)
+    wireB.push({x:[BXS + 0.16, BBL], y:[BYS[k], BYS[k]], mode:"lines", showlegend:false,
+      line:{color:C.axis, width:1.6}, hoverinfo:"skip"});
+  const bNode = (x, y, color, text, tip, size) => wireB.push({x:[x], y:[y],
+    mode: text ? "markers+text" : "markers", text: text ? [text] : undefined,
+    textposition:"middle center", textfont:{color:"#fff", size:12}, showlegend:false,
+    marker:{size: size || 30, color, line:{color:C.surface, width:2}},
+    hovertemplate: tip ? tip + "<extra></extra>" : undefined, hoverinfo: tip ? undefined : "skip"});
+  bNode(BXI, BYIN[0], C.blue, "x₁", "feature 1");
+  bNode(BXI, BYIN[1], C.blue, "x₂", "feature 2");
+  bNode(BXI, -2.9, C.muted, "1", "constant input");
+  bNode(BXH, -3.3, C.muted, "1", "constant input");
+  for (let j = 0; j < H; j++) {
+    bNode(BXH, BYH[j], C.ink2, null, `hidden node ${j+1} (sigmoid)`, 30);
+    const ix = [], iy = [];
+    for (let t = 0; t <= 20; t++) {
+      const u = t/20 - 0.5;
+      ix.push(BXH + u*0.15); iy.push(BYH[j] + (sig(u*14) - 0.5)*0.28);
+    }
+    wireB.push({x:ix, y:iy, mode:"lines", line:{color:"#fff", width:2}, hoverinfo:"skip", showlegend:false});
+  }
+  for (let k = 0; k < 3; k++) bNode(BXS, BYS[k], KCOL[k], "Σ", `class ${k+1} score (a weighted sum)`);
+  Plotly.newPlot(pre + "-wire", wireB, {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:320,
+    margin:{l:10, r:10, t:6, b:6}, showlegend:false,
+    xaxis:{visible:false, range:[-0.3, 6.9]}, yaxis:{visible:false, range:[-3.7, 2.7]},
+    shapes:[{type:"rect", x0:BBL, x1:BBR, y0:-1.9, y1:1.9,
+             line:{color:C.axis, width:1.2}, fillcolor:"#f6f5f2", layer:"below"}],
+    annotations:[
+      {x:(BBL + BBR)/2, y:0, xref:"x", yref:"y", text:"softmax", showarrow:false, font:{color:C.ink2, size:13}},
+      ...[0,1,2].map(k => ({x:BBR + 0.75, y:BYS[k], ax:BBR + 0.08, ay:BYS[k], xref:"x", yref:"y",
+         axref:"x", ayref:"y", showarrow:true, arrowhead:3, arrowsize:1.1, arrowwidth:1.5, arrowcolor:C.axis})),
+      ...[0,1,2].map(k => ({x:BBR + 0.98, y:BYS[k], xref:"x", yref:"y", text:"p" + "₁₂₃"[k],
+         showarrow:false, font:{color:KCOL[k], size:14}})),
+    ],
+    hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+  }, CONF);
+  const fmtB = t => (t >= 0 ? "+" : "") + t.toFixed(2);
+  function wireUpdate() {
+    const vals = [];
+    for (let j = 0; j < H; j++) vals.push(P.W1[j][0], P.W1[j][1], P.b1[j]);
+    for (let k = 0; k < 3; k++) {
+      for (let j = 0; j < H; j++) vals.push(P.W2[k][j]);
+      vals.push(P.b2[k]);
+    }
+    const widths = vals.map(v => Math.min(5, 0.4 + 1.6*Math.abs(v)));
+    const tips = vals.map((v, i) => `${edgeNames[i]} = ${fmtB(v)}<extra></extra>`);
+    Plotly.restyle(pre + "-wire", {"line.width": widths, hovertemplate: tips},
+      Array.from({length: NEDGE}, (_, i) => i));
+  }
+
   function fwd(p) {
     const h = [];
     for (let j = 0; j < H; j++) h.push(sig(P.W1[j][0]*p[0] + P.W1[j][1]*p[1] + P.b1[j]));
@@ -699,6 +831,7 @@ function mapFigure(div, X, y, ex, ey, gridN) {
     }));
     Plotly.restyle(pre + "-map", {z: [z]}, [0]);
     triUpdate(pre + "-tri", X.map(pt => fwd(pt)[1]), y);
+    wireUpdate();
     $(pre + "-ce").textContent = ce.toFixed(4);
     $(pre + "-acc").textContent = (100*acc).toFixed(1) + "%";
     $(pre + "-epoch").textContent = epoch;
