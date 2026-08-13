@@ -478,6 +478,8 @@ function figLayout(height) {
   };
 }
 const CONF = {responsive:true, displayModeBar:false};
+// the 1.3*FLOOR underfit threshold is tuned to THIS target (3 blocks stall ~2.4x floor);
+// revisit it if the generating function ever changes
 function winText(mse, epoch, stuckMsg) {
   if (mse < FLOOR - 5e-4) return "(even lower than the generating parameters: the network is fitting some of the noise too!)";
   if (Math.abs(mse - FLOOR) <= 5e-4) return "(as low as the noise allows!)";
