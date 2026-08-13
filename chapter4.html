@@ -274,10 +274,17 @@ $$z_k = w_{k1} x_1 + w_{k2} x_2 + b_k, \qquad p = \text{softmax}(z)$$
       accuracy a little above it. Recall chapter 2: on the points we trained on, fitting some
       of the noise is always possible. The recipe's numbers are the right target, not a
       record to beat.</li>
-  <li><b>(Optional) Why softmax of a weighted sum?</b> Softmax treats its inputs as
-      log-probabilities, so our model is really a claim: <em>the log-probability of each
-      class is a linear function of the features</em>. For this dataset the claim is exactly
-      right. The clusters are equally spread, so Bayes' rule gives
+  <li><b>(Optional) Question:</b> the logic behind softmax is that its inputs live in
+      log-space: it maps log-probabilities to probabilities. But our scores are just
+      weighted sums of the point's coordinates. Nothing about
+      $w_{k1} x_1 + w_{k2} x_2 + b_k$ says "log-probability", these are plain numbers built
+      from plain coordinates. What gives us the right to put them through softmax?</li>
+  <li><b>Answer:</b> using softmax <em>is</em> the claim. The model does not discover that
+      the scores are log-probabilities; it <em>declares</em> them to be:
+      <em>the log-probability of each class is assumed to be a linear function of the
+      features</em>, and training then finds the best such function, the same way chapter 1
+      assumed a line and least squares found the best one. And for this dataset the claim
+      happens to be exactly right. The clusters are equally spread, so Bayes' rule gives
       $$p(\text{class } k \mid x) \propto e^{-\|x - \mu_k\|^2 / 2\sigma^2},$$
       where $\mu_k$ is the center of cluster $k$. Expand the square: the $\|x\|^2$ part is
       the same for every class, and softmax ignores anything shared by all the scores
