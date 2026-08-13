@@ -127,7 +127,11 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
 <h2>1. From a Number to a Choice</h2>
 <ul>
   <li>Our new data: each point has <b>two features</b> $(x_1, x_2)$, and a label that is one
-      of three classes. We generated the points from three overlapping clusters (one cluster
+      of three classes. The two features are what we plot: $x_1$ is the point's horizontal
+      position and $x_2$ its vertical position, so the plane below <em>is</em> the space of
+      features. (In a real problem the features would be two measurements of the thing being
+      classified, and with more than two features there would be no plot to draw, but the
+      network would not care.) We generated the points from three overlapping clusters (one cluster
       per class), so some points sit among points of a different class: <b>no boundary can get
       everything right</b>, exactly like the noise in our regression chapters.</li>
   <li>How do we write the target? Not as the number 1, 2, or 3 (class 3 is not "bigger" than
