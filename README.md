@@ -12,4 +12,5 @@ The demo above is from Chapter 2: a network with three sigmoid hidden nodes lear
 
 1. [Linear regression as a neural network](https://acycliq.github.io/neural_nets_from_scratch/): recap linear regression with sliders, draw the same model as a network diagram, then add a hidden layer and build a new function out of two lego blocks (ReLU or sigmoid).
 2. [Non-linear regression with gradient descent](https://acycliq.github.io/neural_nets_from_scratch/chapter2.html): three sigmoid blocks fit a non-linear function, with a train button, an epoch replay slider, and a noise slider.
+3. [A second hidden layer](https://acycliq.github.io/neural_nets_from_scratch/chapter3.html): when one hidden layer cannot fit the shape, fix it by going wider or deeper, and count the parameters either way.
 
