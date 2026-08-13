@@ -306,10 +306,16 @@ $$h_j = \phi(w_j x + b_j), \qquad a_k = \phi(u_{k1} h_1 + u_{k2} h_2 + d_k), \qq
   <li>On this function the two fixes cost exactly the same. The difference is <b>strategy</b>:
       the wide network used a full block for each of the four steps; the deep network built
       one bump and got both valleys out of it.</li>
-  <li>Reuse is what scales. If the pattern in the function showed up again (eight steps), the
-      wide network would need eight blocks, paying full price each time. The deep network
-      can reuse what its first layer builds, so its cost grows much more slowly. The gap
-      grows with the size of the pattern.</li>
+  <li>Reuse is what scales. But let's be clear about what this example did and did not show:
+      it showed that depth <b>can</b> reuse (both valleys came from one bump); it did not
+      show depth winning the count, since the two fixes came out equal here. The win is an
+      argument about bigger patterns: if the pattern in the function showed up again (eight
+      steps), the wide network would need eight blocks, paying full price each time, while
+      the deep network can keep reusing what its first layer builds. The gap grows with the
+      size of the pattern.</li>
+  <li>The fair summary: depth gives reuse, and the price is harder training (recall the
+      starting-point note above). For a function as simple as chapter 2's, a single
+      wide-enough hidden layer is a perfectly good choice.</li>
   <li>This idea, <b>learn a shape once, reuse it everywhere</b>, is the heart of deep
       learning, and we will see it again in its most famous form when we get to images:
       convolutional networks reuse the same small pattern at every position of a picture.</li>
@@ -391,7 +397,8 @@ for epoch in range(400_000):
       they build <b>steps out of shapes</b> instead of steps out of $x$.</li>
   <li>Both fixes cost 13 parameters here; the deep one built a single bump and used it for
       both valleys. Reuse is why depth scales better when the same shape shows up again and
-      again.</li>
+      again (an argument about bigger patterns; on this one the two costs came out
+      equal).</li>
   <li>With depth, different parameter settings can produce the same function. Gradient
       descent found a different recipe than the one we used, and that is fine: only the
       output matters.</li>
