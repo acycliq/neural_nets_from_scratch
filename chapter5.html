@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 5: Generalization</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<style>
+  :root {
+    --orange:#eb6834; --red:#c1121f; --green:#3a9d6e; --gold:#c8930c; --plum:#a94f86;
+    --surface:#fcfcfb; --grid:#e1e0d9; --axis:#c3c2b7;
+    --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface); color: var(--ink);
+    margin: 0; padding: 0 20px 80px; line-height: 1.6;
+  }
+  main { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 1.9em; margin: 55px 0 8px; }
+  h2 { font-size: 1.4em; margin: 64px 0 12px; }
+  p, li { color: var(--ink2); }
+  ul { padding-left: 22px; } li { margin: 5px 0; }
+  ol { padding-left: 22px; }
+  b, strong { color: var(--ink); }
+  .spacer { height: 26px; }
+  .panel {
+    background: #fff; border: 1px solid var(--grid); border-radius: 8px;
+    padding: 16px 18px 8px; margin: 18px 0;
+  }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%;
+    height: 7px; border-radius: 4px; background: var(--grid); margin: 8px 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--thumb, var(--ink2));
+    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--thumb, var(--ink2));
+    border: 2.5px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
+  }
+  input[type=range]::-moz-range-track {
+    height: 5px; border-radius: 3px; background: var(--grid);
+  }
+  button {
+    font: inherit; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+    border: 1px solid var(--axis); background: #fff; color: var(--ink2);
+  }
+  button:hover { border-color: var(--ink2); }
+  button.primary { background: var(--orange); border-color: var(--orange); color: #fff; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .score { font-size: 14px; color: var(--ink2); margin: 8px 0; }
+  .score b { color: var(--ink); }
+  .win { color: var(--muted); }
+  pre {
+    background: #f6f5f2; border: 1px solid var(--grid); border-radius: 6px;
+    padding: 12px 14px; font-size: 12.5px; overflow-x: auto; line-height: 1.45;
+  }
+  .tabs { display: flex; gap: 8px; margin: 10px 0 0; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 70px; }
+  a { color: var(--orange); }
+  nav.side {
+    display: none; position: fixed; top: 0; left: 0; bottom: 0; width: 235px;
+    padding: 30px 18px; border-right: 1px solid var(--grid);
+    background: #faf9f6; overflow-y: auto; font-size: 13.5px; line-height: 1.45;
+  }
+  nav.side .site {
+    display: block; font-weight: 700; color: var(--ink);
+    text-decoration: none; margin-bottom: 16px;
+  }
+  nav.side a { display: block; color: var(--ink2); text-decoration: none; padding: 4px 0; }
+  nav.side a:hover { color: var(--ink); }
+  nav.side a.here { color: var(--ink); font-weight: 600; }
+  nav.side .secs { margin: 2px 0 8px; }
+  nav.side .secs a { padding: 2px 0 2px 14px; font-size: 12.5px; color: var(--muted); }
+  nav.side .secs a:hover { color: var(--ink); }
+  @media (min-width: 1120px) {
+    nav.side { display: block; }
+    body { padding-left: 275px; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Chapter 5: Generalization</h1>
+
+<div class="spacer"></div>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Explain the difference between <b>training loss</b> and <b>test loss</b>, and why the second one is the one that matters</li>
+  <li>Recognize <b>overfitting</b> on a plot: training loss still going down while test loss gets worse</li>
+  <li>Overfit a dataset by hand, and pay the price on new points</li>
+  <li>Read a flexibility plot: underfitting on one side, overfitting on the other</li>
+  <li>State the <b>golden rule</b>: test points are for measuring, never for choosing</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Motivation</h2>
+<ul>
+  <li>Three times now this series has said that a loss below the generating recipe's is a
+      <b>warning</b>, not a win, and three times you had to take our word for it, because on
+      the training points the lower loss really is lower.</li>
+  <li>This chapter measures it instead. The idea: a model's job is not to do well on the
+      points it trained on. Its job is to do well on <b>points it has never seen</b>. Those
+      are different things, and the gap between them is the whole game.</li>
+  <li>The plan: hold some points back, watch a too-big network win on the training points and
+      lose on the new ones, do the same thing with your own hand, and then map out where the good
+      models are found.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>1. Held-Out Points: the Train / Test Split</h2>
+<ul>
+  <li>The data comes from <b>chapter 2's exact recipe</b> (three sigmoid blocks plus noise),
+      but this time we keep the parameter values on the table since the point of this chapter
+      is elsewhere. We generated 80 points and split them:
+    <ul>
+      <li><b>20 training points</b> (filled gray dots): the only points the network is ever
+          allowed to learn from;</li>
+      <li><b>60 test points</b> (open circles): set aside during training, used only to
+          measure.</li>
+    </ul>
+  </li>
+  <li>Both sets come from the same recipe with the same noise, so a model that truly learned
+      the recipe scores about the same on both. A model that only memorized its 20 training
+      points does not.</li>
+  <li>Note that 20 training points is not much, and that is on purpose: small datasets are
+      where the danger is greatest.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>2. Watch a Big Network Overfit</h2>
+<ul>
+  <li>The network below has <b>12 blocks</b> (37 parameters) for data that was made with 3.
+      By chapter 3's counting, that is far more flexibility than the function needs, and with
+      only 20 training points, more parameters than points.</li>
+  <li>Press <b>train</b> and read the two plots together:
+    <ul>
+      <li><b>Left:</b> the fit. Filled dots are training points, open circles are test
+          points. The purple curve is trained on the filled dots only.</li>
+      <li><b>Right:</b> the two losses, epoch by epoch. The dark curve is the training loss,
+          the orange curve is the test loss, and the dashed lines are what the generating
+          recipe scores on each set.</li>
+    </ul>
+  </li>
+  <li>Early on, both losses fall together: the network is learning the real shape, and the
+      real shape helps on both sets. Then the curves <b>separate</b>: the training loss keeps
+      going down, below its dashed line and beyond, while the test loss turns around and goes
+      back up. From that moment on, every epoch makes the model better at its 20 points and
+      worse at its job.</li>
+  <li>Look at the purple curve after training: it bends hard to pass near individual
+      training dots, and the open circles are left behind. That wiggle is what memorizing
+      looks like.</li>
+</ul>
+
+<div class="panel">
+  <div class="tabs">
+    <button id="pM-train" class="primary">train</button>
+    <button id="pM-reset">reset</button>
+  </div>
+  <div class="score">training loss: <b id="pM-tr"></b>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;test loss: <b id="pM-te"></b></span>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;epoch: <b id="pM-epoch">0</b></span>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;the recipe: <b id="pM-ftr"></b> / <b id="pM-fte"></b></span></div>
+  <div class="score win" id="pM-win" style="min-height:1.6em; margin:-2px 0 6px;"></div>
+  <label style="display:block; font-size:13px; color:var(--ink2); margin:2px 0 6px;">replay the training (drag through the epochs)
+    <input id="pM-replay" type="range" min="0" max="0" step="1" value="0" style="--thumb:#52514e;"></label>
+  <div style="display:flex; flex-wrap:wrap; gap:0;">
+    <div id="pM-fit" style="flex:1 1 340px; min-width:300px;"></div>
+    <div id="pM-loss" style="flex:1 1 300px; min-width:280px;"></div>
+  </div>
+</div>
+
+<ul>
+  <li>Drag the replay slider to the point where the orange curve is lowest and look at the
+      fit: the model at that moment is the best this network ever was. Every epoch after that
+      point makes it worse. (Stopping there on purpose is called <b>early stopping</b>, one
+      of the standard ways to deal with overfitting; more on those in a later chapter.)</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>3. Your Turn to Overfit</h2>
+<ul>
+  <li>In chapter 2 you could beat the network by drawing a curve through every dot. Time to
+      collect on that. <b>Press and drag across the plot below</b> to draw a curve through
+      the 20 training dots. Try to pass through every single one: your training loss can go
+      far below anything the generating recipe scores.</li>
+  <li>Then press <b>reveal the test points</b>.</li>
+</ul>
+
+<div class="panel">
+  <div id="pS-fig"></div>
+  <div class="score">your guess: training loss <b id="pS-tr">–</b><span id="pS-hint" class="win"></span>
+    <button id="pS-reveal" class="primary" style="float:right; font-size:12px; padding:4px 10px;">reveal the test points</button>
+    <button id="pS-clear" style="float:right; font-size:12px; padding:4px 10px; margin-right:8px;">clear</button></div>
+  <div class="score" id="pS-compare" style="display:none;"></div>
+  <div class="score win" id="pS-win" style="min-height:1.6em; margin:-2px 0 6px;"></div>
+</div>
+
+<ul>
+  <li>For comparison, we also trained <b>chapter 2's plain 3-block network</b> on the same
+      20 training points. It cannot pass through every dot, it does not have the flexibility,
+      so you will beat it easily on the training loss. Watch what happens on the test
+      points.</li>
+  <li>This is the whole trade in one picture: every wiggle you put in to catch a training
+      dot is a guess that the wiggle is real. The noise made sure most of those guesses are
+      wrong.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>4. The Flexibility Plot</h2>
+<ul>
+  <li>So far: too much flexibility memorizes the points (this chapter), too little cannot
+      follow the function at all (chapter 3). Let's map the whole range. The button below
+      trains <b>10 networks</b>, with 1 to 10 blocks, all on the same 20 training points,
+      and plots both losses against the number of blocks.</li>
+</ul>
+
+<div class="panel">
+  <div class="tabs">
+    <button id="pC-run" class="primary">train all 10 networks</button>
+    <span class="score" id="pC-status" style="margin:6px 0 0 6px;"></span>
+  </div>
+  <div id="pC-fig"></div>
+</div>
+
+<ul>
+  <li>Reading the finished plot:
+    <ul>
+      <li><b>Left side (1 block):</b> both losses high. The model cannot represent the
+          function; more training will not help. Chapter 3 called this underfitting.</li>
+      <li><b>Right side (many blocks):</b> training loss low and still going down, test loss
+          high and rising. The extra blocks are spent memorizing noise.</li>
+      <li><b>The bottom of the test curve</b> sits at 2 to 3 blocks, the scale of the true
+          recipe. With only 20 noisy points, even the true recipe's flexibility is almost
+          more than the data can support.</li>
+    </ul>
+  </li>
+  <li>The test curve is not perfectly smooth from one block count to the next: each network
+      is a separate training run, and gradient descent has its own luck. Read the trend, not
+      the individual bumps.</li>
+  <li>The training loss alone would tell you to keep adding blocks forever. This plot is why
+      nobody chooses a model by its training loss.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>5. The Golden Rule</h2>
+<ul>
+  <li>The test set is for <b>measuring</b>, never for <b>choosing</b>. The moment you use it
+      to pick the number of blocks, or the stopping epoch, or anything else, you have, in
+      effect, trained on it, and it is no longer a fair measure of performance on new
+      data.</li>
+  <li>A note about this page: we showed the test loss <em>during</em> training, which is
+      exactly what the rule says not to do. That is fine for teaching (the gradient never
+      saw a test point, and we are not choosing anything), but in real work the choosing is
+      done on a third split, the <b>validation set</b>, and the test set is used once, at
+      the very end.</li>
+  <li>The rule is easy to state and easy to break without noticing. It gets its own
+      treatment when we tune real models.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Chapter Highlights</h2>
+<ol>
+  <li>Training loss measures the points the model saw; test loss measures the job. They can
+      move in opposite directions, and when they do, the model is <b>overfitting</b>.</li>
+  <li>A too-flexible network on too few points wins on training data by memorizing noise,
+      and is punished for every memorized wiggle on new data. You did it by hand, so you
+      know exactly how it feels.</li>
+  <li>Flexibility is a trade: too little gives underfitting (chapter 3), too much gives
+      overfitting (this chapter), and the best test loss sits near the scale of the true
+      function.</li>
+  <li>The low point of the test curve is a moment worth stopping at: early stopping is one
+      of several ways to deal with overfitting that we will meet.</li>
+  <li>The golden rule: test points measure, they never choose. Choosing belongs to a
+      validation set.</li>
+</ol>
+
+<footer>
+Previous: <a href="chapter4.html">Chapter 4: Classification with Softmax</a>.
+Next: the training toolkit, where gradient descent itself gets better: momentum, minibatches, and smarter learning rates.
+</footer>
+
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const sig = z => 1/(1 + Math.exp(-z));
+const C = { orange:"#eb6834", red:"#c1121f", green:"#3a9d6e", gold:"#c8930c",
+            purple:"#8a63c4", blue:"#2a78d6", muted:"#898781", surface:"#fcfcfb",
+            grid:"#e1e0d9", axis:"#c3c2b7", ink:"#0b0b0b", ink2:"#52514e" };
+const FONT = { family:'system-ui, -apple-system, "Segoe UI", sans-serif', color:C.ink2, size:12 };
+const CONF = {responsive:true, displayModeBar:false};
+function paintSlider(el) {
+  const min = +el.min, max = +el.max, v = +el.value;
+  const pct = (v - min) / (max - min) * 100;
+  const color = getComputedStyle(el).getPropertyValue("--thumb") || "#52514e";
+  el.style.background = `linear-gradient(to right, ${color} ${pct}%, var(--grid) ${pct}%)`;
+}
+
+/* ---- data: chapter 2's recipe, split into train and test ----------------- */
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rnd = mulberry32(69);
+function gauss() {
+  let u = 0, v = 0;
+  while (!u) u = rnd();
+  while (!v) v = rnd();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+const SEC = { l:[-2, 0, 2], w:[2, 2.5, 1.5], v:[1.2, -1.8, 0.9], c:0.4 };
+const truef = x => SEC.c + SEC.v.reduce((s, vj, j) => s + vj*sig(SEC.w[j]*(x - SEC.l[j])), 0);
+const SIGMA = 0.25, NTR = 20, NTE = 60;
+const xtr = [], ytr = [], xte = [], yte = [];
+let FTR = 0, FTE = 0;
+for (let i = 0; i < NTR; i++) {
+  const x = -6 + 12*rnd(), e = gauss();
+  xtr.push(x); ytr.push(truef(x) + SIGMA*e); FTR += (SIGMA*e)**2;
+}
+for (let i = 0; i < NTE; i++) {
+  const x = -6 + 12*rnd(), e = gauss();
+  xte.push(x); yte.push(truef(x) + SIGMA*e); FTE += (SIGMA*e)**2;
+}
+FTR /= NTR; FTE /= NTE;
+const NX = 400, xg = [];
+for (let i = 0; i < NX; i++) xg.push(-6 + 12*i/(NX-1));
+
+/* ---- shared k-block machinery (train on the 20 training points) ---------- */
+function makeNet(k) {
+  const locs = k === 1 ? [0] : k === 2 ? [-2, 2]
+    : Array.from({length: k}, (_, j) => -4.5 + 9*j/(k-1));
+  return { k,
+    w: Array(k).fill(1),
+    b: locs.map(l => -l),
+    v: locs.map((_, j) => (j % 2 === 0 ? 0.4 : -0.4)),
+    c: 0 };
+}
+function netLoss(P, xs, ys) {
+  let s = 0;
+  for (let i = 0; i < xs.length; i++) {
+    let u = P.c;
+    for (let j = 0; j < P.k; j++) u += P.v[j]*sig(P.w[j]*xs[i] + P.b[j]);
+    s += (u - ys[i])**2;
+  }
+  return s/xs.length;
+}
+function setC(P) {
+  let s = 0;
+  for (let i = 0; i < NTR; i++) {
+    let u = 0;
+    for (let j = 0; j < P.k; j++) u += P.v[j]*sig(P.w[j]*xtr[i] + P.b[j]);
+    s += ytr[i] - u;
+  }
+  P.c = s/NTR;
+}
+function gdSteps(P, n, lr) {
+  for (let t = 0; t < n; t++) {
+    const k = P.k, gw = Array(k).fill(0), gb = Array(k).fill(0), gv = Array(k).fill(0);
+    for (let i = 0; i < NTR; i++) {
+      const x = xtr[i], a = [];
+      let u = P.c;
+      for (let j = 0; j < k; j++) { a[j] = sig(P.w[j]*x + P.b[j]); u += P.v[j]*a[j]; }
+      const err = u - ytr[i];
+      for (let j = 0; j < k; j++) {
+        gv[j] += err*a[j];
+        const da = err*P.v[j]*a[j]*(1 - a[j]);
+        gw[j] += da*x; gb[j] += da;
+      }
+    }
+    for (let j = 0; j < k; j++) {
+      P.w[j] -= lr*2/NTR*gw[j]; P.b[j] -= lr*2/NTR*gb[j]; P.v[j] -= lr*2/NTR*gv[j];
+    }
+    setC(P);
+  }
+}
+function netCurve(P) {
+  return xg.map(x => {
+    let u = P.c;
+    for (let j = 0; j < P.k; j++) u += P.v[j]*sig(P.w[j]*x + P.b[j]);
+    return u;
+  });
+}
+
+/* ---- panel M: the 12-block network --------------------------------------- */
+(function panelM() {
+  const pre = "pM", K = 12, MAXE = 400000, LR = 0.25;
+  let P = makeNet(K), epoch = 0, training = false, hist = [];
+  function shouldSnap(e) {
+    if (e <= 100) return true;
+    if (e <= 1000) return e % 10 === 0;
+    if (e <= 10000) return e % 100 === 0;
+    return e % 2000 === 0;
+  }
+  let SNAPS = 0;
+  for (let e = 1; e <= MAXE; e++) if (shouldSnap(e)) SNAPS++;
+
+  Plotly.newPlot(pre + "-fit", [
+    { x:xtr, y:ytr, mode:"markers", name:"training points",
+      marker:{color:C.muted, size:7, opacity:0.9},
+      hovertemplate:"train: x = %{x:.2f}, y = %{y:.2f}<extra></extra>" },
+    { x:xte, y:yte, mode:"markers", name:"test points",
+      marker:{color:C.muted, size:6, symbol:"circle-open", opacity:0.9},
+      hovertemplate:"test: x = %{x:.2f}, y = %{y:.2f}<extra></extra>" },
+    { x:xg, y:[], mode:"lines", name:"network output ŷ",
+      line:{color:C.purple, width:3.0}, hoverinfo:"skip" },
+  ], {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:340,
+    margin:{l:45, r:15, t:26, b:38}, showlegend:true,
+    legend:{orientation:"h", x:0, y:1.09, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)"},
+    xaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis, title:{text:"x"}},
+    yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis, range:[-2.2, 2.6]},
+  }, CONF);
+  Plotly.newPlot(pre + "-loss", [
+    { x:[], y:[], mode:"lines", name:"training loss", line:{color:C.ink2, width:2.2}, hoverinfo:"skip" },
+    { x:[], y:[], mode:"lines", name:"test loss", line:{color:C.orange, width:2.2}, hoverinfo:"skip" },
+    { x:[1, MAXE], y:[FTR, FTR], mode:"lines", name:"the recipe (train)",
+      line:{color:C.ink2, width:1, dash:"dot"}, hoverinfo:"skip" },
+    { x:[1, MAXE], y:[FTE, FTE], mode:"lines", name:"the recipe (test)",
+      line:{color:C.orange, width:1, dash:"dot"}, hoverinfo:"skip" },
+    { x:[], y:[], mode:"lines", showlegend:false, line:{color:C.axis, width:1.2}, hoverinfo:"skip" },
+  ], {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:340,
+    margin:{l:45, r:15, t:26, b:38}, showlegend:true,
+    legend:{orientation:"h", x:0, y:1.09, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)"},
+    xaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+           title:{text:"epoch"}, type:"log", range:[0, Math.log10(MAXE)]},
+    yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+           rangemode:"tozero"},
+  }, CONF);
+
+  const snap = () => ({e: epoch, w: P.w.slice(), b: P.b.slice(), v: P.v.slice(), c: P.c,
+                       ltr: netLoss(P, xtr, ytr), lte: netLoss(P, xte, yte)});
+  function restore(h) { P.w = h.w.slice(); P.b = h.b.slice(); P.v = h.v.slice(); P.c = h.c; epoch = h.e; }
+  function redraw() {
+    const ltr = netLoss(P, xtr, ytr), lte = netLoss(P, xte, yte);
+    Plotly.restyle(pre + "-fit", {y: [netCurve(P)]}, [2]);
+    const es = hist.map(h => Math.max(1, h.e));
+    const ymax = 1.05 * Math.max(0.15, ...hist.map(h => Math.max(h.ltr, h.lte)));
+    Plotly.restyle(pre + "-loss", {x: [es, es, undefined, undefined, [Math.max(1, epoch), Math.max(1, epoch)]],
+      y: [hist.map(h => h.ltr), hist.map(h => h.lte), undefined, undefined, [0, ymax]]},
+      [0, 1, 2, 3, 4]);
+    $(pre + "-tr").textContent = ltr.toFixed(4);
+    $(pre + "-te").textContent = lte.toFixed(4);
+    $(pre + "-epoch").textContent = epoch;
+    $(pre + "-win").textContent =
+      (ltr < FTR - 5e-4 && lte > 1.5*FTE)
+        ? "(the training loss keeps improving and the test loss is getting worse: the network is memorizing its 20 points)"
+        : "";
+  }
+  function histReset() {
+    hist = [snap()];
+    $(pre + "-replay").max = SNAPS;
+    $(pre + "-replay").value = 0;
+    paintSlider($(pre + "-replay"));
+  }
+  function trainLoop() {
+    if (!training) return;
+    const chunk = epoch < 100 ? 2 : epoch < 1000 ? 25 : epoch < 10000 ? 250 : 4000;
+    const n = Math.min(chunk, MAXE - epoch);
+    // step one epoch at a time so log-spaced snapshots land exactly
+    for (let t = 0; t < n; t++) {
+      gdSteps(P, 1, LR);
+      epoch++;
+      if (shouldSnap(epoch)) hist.push(snap());
+    }
+    $(pre + "-replay").value = hist.length - 1;
+    paintSlider($(pre + "-replay"));
+    redraw();
+    if (epoch >= MAXE) { training = false; $(pre + "-train").textContent = "train"; return; }
+    requestAnimationFrame(trainLoop);
+  }
+  $(pre + "-train").addEventListener("click", () => {
+    if (!training) hist = hist.slice(0, Math.min(+$(pre + "-replay").value + 1, hist.length));
+    training = !training;
+    $(pre + "-train").textContent = training ? "pause" : "train";
+    if (training) requestAnimationFrame(trainLoop);
+  });
+  $(pre + "-reset").addEventListener("click", () => {
+    training = false; $(pre + "-train").textContent = "train";
+    P = makeNet(K); setC(P); epoch = 0;
+    histReset(); redraw();
+  });
+  $(pre + "-replay").addEventListener("input", () => {
+    training = false; $(pre + "-train").textContent = "train";
+    const i = Math.min(+$(pre + "-replay").value, hist.length - 1);
+    $(pre + "-replay").value = i;
+    paintSlider($(pre + "-replay"));
+    restore(hist[i]); redraw();
+  });
+  $(pre + "-ftr").textContent = FTR.toFixed(4);
+  $(pre + "-fte").textContent = FTE.toFixed(4);
+  setC(P); histReset(); redraw();
+})();
+
+/* ---- panel S: draw your guess, then reveal the test points --------------- */
+(function panelS() {
+  const pre = "pS";
+  // the honest 3-block reference, trained quietly on the same 20 points
+  const REF = makeNet(3);
+  setC(REF); gdSteps(REF, 150000, 0.25);
+  const refTr = netLoss(REF, xtr, ytr), refTe = netLoss(REF, xte, yte);
+
+  const SKN = 121, skx = [], sky = Array(SKN).fill(null);
+  for (let i = 0; i < SKN; i++) skx.push(-6 + 12*i/(SKN-1));
+  Plotly.newPlot(pre + "-fig", [
+    { x:xtr, y:ytr, mode:"markers", name:"training points",
+      marker:{color:C.muted, size:7, opacity:0.9}, hoverinfo:"skip" },
+    { x:[], y:[], mode:"markers", name:"test points",
+      marker:{color:C.orange, size:6, symbol:"circle-open", opacity:0.9}, hoverinfo:"skip" },
+    { x:skx, y:sky, mode:"lines", name:"your guess",
+      line:{color:C.ink2, width:2.6}, connectgaps:false, hoverinfo:"skip" },
+    { x:xg, y:[], mode:"lines", name:"the 3-block network",
+      line:{color:C.purple, width:2.2, dash:"dot"}, hoverinfo:"skip" },
+  ], {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:340,
+    margin:{l:45, r:15, t:10, b:38}, showlegend:true, dragmode:false,
+    legend:{orientation:"h", x:0, y:1.05, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)"},
+    xaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+           title:{text:"x"}, range:[-6.3, 6.3], fixedrange:true},
+    yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+           range:[-2.2, 2.6], fixedrange:true},
+  }, CONF);
+  $(pre + "-fig").style.cursor = "crosshair";
+
+  let drawing = false, lastIdx = null, lastY = null, revealed = false;
+  function sketchAt(e) {
+    const gsk = $(pre + "-fig");
+    // _fullLayout / p2d / _offset are private Plotly API: pinned to plotly-2.35.2 above
+    const fl = gsk._fullLayout, bb = gsk.getBoundingClientRect();
+    const x = fl.xaxis.p2d(e.clientX - bb.left - fl.xaxis._offset);
+    const y = fl.yaxis.p2d(e.clientY - bb.top - fl.yaxis._offset);
+    const yc = Math.max(-2.2, Math.min(2.6, y));
+    let idx = Math.round((x + 6) / 12 * (SKN - 1));
+    idx = Math.max(0, Math.min(SKN - 1, idx));
+    if (lastIdx === null) sky[idx] = yc;
+    else {
+      const a = Math.min(lastIdx, idx), b = Math.max(lastIdx, idx);
+      for (let i = a; i <= b; i++) {
+        const t = b === a ? 0 : (i - a) / (b - a);
+        sky[i] = lastIdx <= idx ? lastY + t*(yc - lastY) : yc + t*(lastY - yc);
+      }
+    }
+    lastIdx = idx; lastY = yc;
+  }
+  function sketchLoss(xs, ys) {
+    let s = 0, n = 0;
+    for (let i = 0; i < xs.length; i++) {
+      const p = (xs[i] + 6) / 12 * (SKN - 1);
+      const i0 = Math.floor(p), i1 = Math.min(i0 + 1, SKN - 1);
+      if (sky[i0] === null || sky[i1] === null) continue;
+      const yv = sky[i0] + (p - i0) * (sky[i1] - sky[i0]);
+      s += (yv - ys[i])**2; n++;
+    }
+    return n ? [s/n, n] : [null, 0];
+  }
+  function sketchScore() {
+    const [m, n] = sketchLoss(xtr, ytr);
+    if (n >= 0.9*NTR) { $(pre + "-tr").textContent = m.toFixed(4); $(pre + "-hint").textContent = ""; }
+    else {
+      $(pre + "-tr").textContent = "–";
+      $(pre + "-hint").textContent = n ? "  (draw across the whole range first)" : "";
+    }
+  }
+  function redrawSketch() {
+    Plotly.restyle(pre + "-fig", {y: [sky]}, [2]);
+    sketchScore();
+    if (revealed) reveal();
+  }
+  function reveal() {
+    revealed = true;
+    Plotly.restyle(pre + "-fig", {x: [xte], y: [yte]}, [1]);
+    Plotly.restyle(pre + "-fig", {y: [netCurve(REF)]}, [3]);
+    const [mtr, ntr] = sketchLoss(xtr, ytr);
+    const [mte] = sketchLoss(xte, yte);
+    const line = $(pre + "-compare");
+    if (ntr >= 0.9*NTR && mte !== null) {
+      line.style.display = "";
+      line.innerHTML = `your guess: training <b>${mtr.toFixed(4)}</b>, test <b>${mte.toFixed(4)}</b>` +
+        `<span style="color:var(--muted);">&nbsp;·&nbsp;</span>` +
+        `the 3-block network: training <b>${refTr.toFixed(4)}</b>, test <b>${refTe.toFixed(4)}</b>`;
+      $(pre + "-win").textContent = (mtr < refTr && mte > refTe)
+        ? "(you win on the training points and lose on the new ones: that is overfitting)"
+        : "";
+    } else {
+      line.style.display = "";
+      line.textContent = "draw across the whole range first, then the comparison appears here";
+    }
+  }
+  $(pre + "-fig").addEventListener("pointerdown", e => {
+    drawing = true; lastIdx = null;
+    $(pre + "-fig").setPointerCapture(e.pointerId);
+    sketchAt(e); redrawSketch(); e.preventDefault();
+  });
+  $(pre + "-fig").addEventListener("pointermove", e => {
+    if (drawing) { sketchAt(e); redrawSketch(); }
+  });
+  window.addEventListener("pointerup", () => { drawing = false; lastIdx = null; });
+  window.addEventListener("pointercancel", () => { drawing = false; lastIdx = null; });
+  $(pre + "-clear").addEventListener("click", () => {
+    sky.fill(null);
+    Plotly.restyle(pre + "-fig", {y: [sky]}, [2]);
+    sketchScore();
+    $(pre + "-compare").style.display = "none";
+    $(pre + "-win").textContent = "";
+  });
+  $(pre + "-reveal").addEventListener("click", reveal);
+  sketchScore();
+})();
+
+/* ---- panel C: the capacity plot ------------------------------------------ */
+(function panelC() {
+  const pre = "pC", KMAX = 10, EPOCHS = 150000, LR = 0.25;
+  Plotly.newPlot(pre + "-fig", [
+    { x:[], y:[], mode:"lines+markers", name:"training loss",
+      line:{color:C.ink2, width:2.2}, marker:{size:7}, hovertemplate:"%{x} blocks: %{y:.4f}<extra></extra>" },
+    { x:[], y:[], mode:"lines+markers", name:"test loss",
+      line:{color:C.orange, width:2.2}, marker:{size:7}, hovertemplate:"%{x} blocks: %{y:.4f}<extra></extra>" },
+    { x:[1, KMAX], y:[FTR, FTR], mode:"lines", name:"the recipe (train)",
+      line:{color:C.ink2, width:1, dash:"dot"}, hoverinfo:"skip" },
+    { x:[1, KMAX], y:[FTE, FTE], mode:"lines", name:"the recipe (test)",
+      line:{color:C.orange, width:1, dash:"dot"}, hoverinfo:"skip" },
+  ], {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:340,
+    margin:{l:45, r:15, t:26, b:42}, showlegend:true,
+    legend:{orientation:"h", x:0, y:1.09, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)"},
+    xaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+           title:{text:"number of blocks"}, dtick:1, range:[0.5, KMAX + 0.5]},
+    yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+           rangemode:"tozero"},
+  }, CONF);
+  let running = false;
+  $(pre + "-run").addEventListener("click", () => {
+    if (running) return;
+    running = true;
+    $(pre + "-run").disabled = true;
+    const ks = [], trs = [], tes = [];
+    let k = 1;
+    let P = makeNet(k), done = 0;
+    setC(P);
+    const CHUNK = 6000;
+    (function step() {
+      const n = Math.min(CHUNK, EPOCHS - done);
+      gdSteps(P, n, LR);
+      done += n;
+      $(pre + "-status").textContent = `training the ${k}-block network (${Math.round(100*done/EPOCHS)}%)`;
+      if (done >= EPOCHS) {
+        ks.push(k); trs.push(netLoss(P, xtr, ytr)); tes.push(netLoss(P, xte, yte));
+        Plotly.restyle(pre + "-fig", {x: [ks, ks], y: [trs, tes]}, [0, 1]);
+        k++;
+        if (k > KMAX) {
+          $(pre + "-status").textContent = "done: 10 networks, one lesson";
+          running = false;
+          $(pre + "-run").disabled = false;
+          return;
+        }
+        P = makeNet(k); setC(P); done = 0;
+      }
+      requestAnimationFrame(step);
+    })();
+  });
+})();
+</script>
+<nav class="side" id="sidenav"></nav>
+<script>
+(function () {
+  const chapters = [
+    ["index.html", "Chapter 1: Neural Networks, One Lego Block at a Time"],
+    ["chapter2.html", "Chapter 2: Non-linear Regression with Gradient Descent"],
+    ["chapter3.html", "Chapter 3: A Second Hidden Layer"],
+    ["chapter4.html", "Chapter 4: Classification with Softmax"],
+    ["chapter5.html", "Chapter 5: Generalization"],
+  ];
+  const here = location.pathname.split("/").pop() || "index.html";
+  let nav = '<a class="site" href="index.html">Neural nets from scratch</a>';
+  for (const [page, title] of chapters) {
+    const on = page === here;
+    nav += `<a href="${page}"${on ? ' class="here"' : ""}>${title}</a>`;
+    if (on) {
+      nav += '<div class="secs">';
+      document.querySelectorAll("main h2").forEach((h, i) => {
+        if (!h.id) h.id = "sec" + i;
+        nav += `<a href="#${h.id}">${h.textContent}</a>`;
+      });
+      nav += "</div>";
+    }
+  }
+  document.getElementById("sidenav").innerHTML = nav;
+})();
+</script>
+</body>
+</html>
