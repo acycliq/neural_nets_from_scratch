@@ -206,9 +206,9 @@ $$\mathcal{L} = -\log(p_{\text{true class}})$$
 </table>
 
 <ul>
-  <li>Start from the last row: giving the true class nearly all the probability costs almost
-      nothing, spreading the probability around costs a little, and being <b>confident about
-      the wrong class</b> costs a lot. The loss for the whole dataset is the average over
+  <li>Read the table from the top: giving the true class nearly all the probability costs
+      almost nothing, spreading the probability around costs a little, and being <b>confident
+      about the wrong class</b> costs a lot. The loss for the whole dataset is the average over
       the points.</li>
   <li>As in the regression chapters, we will compare the trained loss against the loss of the
       <b>generating recipe</b> (the true cluster probabilities): with overlapping classes
@@ -271,7 +271,7 @@ $$z_k = w_{k1} x_1 + w_{k2} x_2 + b_k, \qquad p = \text{softmax}(z)$$
 
 <ul>
   <li>The trained loss ends a little <b>below</b> the generating recipe's loss, and the
-      accuracy a little above it. Recall chapter 2: on the points we trained on, fitting some
+      accuracy about matches it. Recall chapter 2: on the points we trained on, fitting some
       of the noise is always possible. The recipe's numbers are the right target, not a
       record to beat.</li>
   <li><b>(Optional) Question:</b> the logic behind softmax is that its inputs are in

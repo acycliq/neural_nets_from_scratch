@@ -123,9 +123,9 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
 
 <h2>1. Held-Out Points: the Train / Test Split</h2>
 <ul>
-  <li>The data comes from <b>chapter 2's exact recipe</b> (three sigmoid blocks plus noise),
-      but this time we keep the parameter values on the table since the point of this chapter
-      is elsewhere. We generated 80 points and split them:
+  <li>The data comes from <b>chapter 2's exact recipe</b> (the same three sigmoid blocks,
+      with the noise turned up a little), but this time we keep the parameter values on the
+      table since the point of this chapter is elsewhere. We generated 80 points and split them:
     <ul>
       <li><b>20 training points</b> (filled gray dots): the only points the network is ever
           allowed to learn from;</li>
@@ -518,10 +518,15 @@ function netCurve(P) {
 /* ---- panel S: draw your guess, then reveal the test points --------------- */
 (function panelS() {
   const pre = "pS";
-  // the honest 3-block reference, trained quietly on the same 20 points
-  const REF = makeNet(3);
-  setC(REF); gdSteps(REF, 150000, 0.25);
-  const refTr = netLoss(REF, xtr, ytr), refTe = netLoss(REF, xte, yte);
+  // the 3-block reference, trained on the same 20 points (lazily, on first reveal,
+  // so page load stays instant)
+  let REF = null, refTr = 0, refTe = 0;
+  function ensureRef() {
+    if (REF) return;
+    REF = makeNet(3);
+    setC(REF); gdSteps(REF, 150000, 0.25);
+    refTr = netLoss(REF, xtr, ytr); refTe = netLoss(REF, xte, yte);
+  }
 
   const SKN = 121, skx = [], sky = Array(SKN).fill(null);
   for (let i = 0; i < SKN; i++) skx.push(-6 + 12*i/(SKN-1));
@@ -590,6 +595,7 @@ function netCurve(P) {
     if (revealed) reveal();
   }
   function reveal() {
+    ensureRef();
     revealed = true;
     Plotly.restyle(pre + "-fig", {x: [xte], y: [yte]}, [1]);
     Plotly.restyle(pre + "-fig", {y: [netCurve(REF)]}, [3]);
