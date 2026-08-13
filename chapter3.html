@@ -108,9 +108,9 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
 <h2>Learning Objectives</h2>
 <ul>
   <li>Recognize <b>underfitting</b>: a loss that stays above the noise level no matter how long we train</li>
-  <li>Fix an underfit network two ways: more nodes in the hidden layer, and a second hidden layer</li>
+  <li>Describe two options for an underfit network: more nodes in the hidden layer, and a second hidden layer</li>
   <li>Explain what a second-layer node sees, and how blocks made of blocks arise</li>
-  <li>Compare the two fixes by counting parameters</li>
+  <li>Compare the two options by counting parameters</li>
 </ul>
 
 <div class="spacer"></div>
@@ -121,8 +121,8 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
       The function had three steps and the network had three blocks: a perfect match.</li>
   <li>But what happens when the function has <b>more steps than the network has blocks</b>?
       We generated new data to find out (again from a recipe we are keeping hidden, again with a little noise).</li>
-  <li>The plan: watch the chapter 2 network fail, then fix it two different ways, and count
-      the parameters of each fix.</li>
+  <li>The plan: watch the chapter 2 network fail, then try two options, and count the
+      parameters of each.</li>
 </ul>
 
 <div class="spacer"></div>
@@ -182,7 +182,7 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
 
 <ul>
   <li>Training runs its full 400,000 epochs and the loss gets stuck well above the loss of
-      the generating parameters. <b>No amount of extra training fixes this.</b> The problem is
+      the generating parameters. <b>No amount of extra training helps.</b> The problem is
       not the optimizer; the network simply cannot represent the function.</li>
   <li>This situation is called <b>underfitting</b>: the model does not have enough flexibility
       to match the pattern in the data. Watch the replay: gradient descent does its best and
@@ -192,10 +192,10 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
 
 <div class="spacer"></div>
 
-<h2>2. Fix One: More Nodes in the Hidden Layer</h2>
+<h2>2. Option One: More Nodes in the Hidden Layer</h2>
 <ul>
-  <li>The obvious fix: if three blocks are not enough, use four. Four steps in the data,
-      four blocks in the network, a 1 → 4 → 1 architecture.</li>
+  <li>The first option is the obvious one: if three blocks are not enough, use four. Four
+      steps in the data, four blocks in the network, a 1 → 4 → 1 architecture.</li>
   <li>No sliders this time: gradient descent does the fitting, and we watch.</li>
 </ul>
 
@@ -225,9 +225,9 @@ window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
 
 <div class="spacer"></div>
 
-<h2>3. Fix Two: A Second Hidden Layer</h2>
+<h2>3. Option Two: A Second Hidden Layer</h2>
 <ul>
-  <li>Here is the other fix. Instead of making the one hidden layer wider, we put a
+  <li>Here is the other option. Instead of making the one hidden layer wider, we put a
       <b>second hidden layer</b> between it and the output: a 1 → 2 → 2 → 1 architecture.</li>
   <li>The model, written out (the second layer's parameters are $u_{kj}$ and $d_k$):</li>
 </ul>
@@ -303,12 +303,12 @@ $$h_j = \phi(w_j x + b_j), \qquad a_k = \phi(u_{k1} h_1 + u_{k2} h_2 + d_k), \qq
 </table>
 
 <ul>
-  <li>On this function the two fixes cost exactly the same. The difference is <b>strategy</b>:
+  <li>On this function the two options cost exactly the same. The difference is <b>strategy</b>:
       the wide network used a full block for each of the four steps; the deep network built
       one bump and got both valleys out of it.</li>
   <li>Reuse is what scales. But let's be clear about what this example did and did not show:
       it showed that depth <b>can</b> reuse (both valleys came from one bump); it did not
-      show depth winning the count, since the two fixes came out equal here. The win is an
+      show depth winning the count, since the two options came out equal here. The win is an
       argument about bigger patterns: if the pattern in the function showed up again (eight
       steps), the wide network would need eight blocks, paying full price each time, while
       the deep network can keep reusing what its first layer builds. The gap grows with the
@@ -390,12 +390,12 @@ for epoch in range(400_000):
 <h2>Chapter Highlights</h2>
 <ol>
   <li>When the function has more steps than the network has blocks, the loss gets stuck above
-      the noise level and <b>no amount of training fixes it</b>. This is underfitting.</li>
-  <li>Fix one: more nodes in the same layer. Each new block adds one step and 3 parameters,
-      paying full price for every piece of the pattern.</li>
-  <li>Fix two: a second hidden layer. Its nodes take the first layer's outputs as inputs, so
-      they build <b>steps out of shapes</b> instead of steps out of $x$.</li>
-  <li>Both fixes cost 13 parameters here; the deep one built a single bump and used it for
+      the noise level and <b>no amount of training helps</b>. This is underfitting.</li>
+  <li>Option one: more nodes in the same layer. Each new block adds one step and 3
+      parameters, paying full price for every piece of the pattern.</li>
+  <li>Option two: a second hidden layer. Its nodes take the first layer's outputs as inputs,
+      so they build <b>steps out of shapes</b> instead of steps out of $x$.</li>
+  <li>Both options cost 13 parameters here; the deep one built a single bump and used it for
       both valleys. Reuse is why depth scales better when the same shape shows up again and
       again (an argument about bigger patterns; on this one the two costs came out
       equal).</li>
