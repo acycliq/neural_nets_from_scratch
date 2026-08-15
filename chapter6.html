@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chapter 6: The Training Toolkit</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+<meta name="description" content="Learning rates, momentum, minibatches and Adam, raced against each other on chapter 2's real network, plus the valley that explains why.">
+<meta property="og:title" content="Chapter 6: The Training Toolkit">
+<meta property="og:description" content="Learning rates, momentum, minibatches and Adam, raced against each other on chapter 2's real network, plus the valley that explains why.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://acycliq.github.io/neural_nets_from_scratch/chapter6.html">
+<meta property="og:image" content="https://acycliq.github.io/neural_nets_from_scratch/assets/demo.gif">
+<meta name="twitter:card" content="summary_large_image">
+<script src="https://cdn.plot.ly/plotly-cartesian-2.35.2.min.js" integrity="sha384-gKF7EaMDoWW1zLWkouldmVWF5jqEKrAswAciW73iNzqlomabVVPO60XkJvL5q/Ie" crossorigin="anonymous"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<link rel="stylesheet" href="site.css">
+<style>
+  .controls label { flex: 1; min-width: 150px; }
+  select {
+    font: inherit; padding: 5px 8px; border-radius: 6px;
+    border: 1px solid var(--axis); background: #fff; color: var(--ink2);
+  }
+</style>
+</head>
+<body>
+<main>
+<noscript><p>The interactive panels on this page need JavaScript. The text still reads without it, but the plots and buttons stay empty.</p></noscript>
+
+<h1>Chapter 6: The Training Toolkit</h1>
+
+<div class="spacer"></div>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>State the question each tool answers: step size (learning rate), remembered direction
+      (momentum), cost per step (minibatches), a rate per parameter (Adam)</li>
+  <li>Explain why a single learning rate cannot suit a valley-shaped loss surface</li>
+  <li>Choose between the tools: which to reach for, when, and what each can get wrong</li>
+  <li>Race the tools against each other on a real network, and know what the toolkit cannot
+      do</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Motivation</h2>
+<ul>
+  <li>Every training run in this series so far used plain gradient descent with a learning
+      rate of 0.25, and we never said why. This chapter explains it: where the number comes
+      from, what happens when it is wrong, and what the standard improvements do.</li>
+  <li>Nothing about the networks changes. The toolkit is entirely about <b>how we descend</b>,
+      not what we descend on. And each tool in it is the answer to one specific question that
+      plain gradient descent answers badly:
+    <ol>
+      <li>How big should a step be? (the learning rate, and its cliff)</li>
+      <li>Can the path remember the direction it was already going? (momentum)</li>
+      <li>Does every step need to look at all the data? (minibatches)</li>
+      <li>Can each parameter have its own step size? (Adam)</li>
+    </ol>
+  </li>
+  <li>The test track for everything: chapter 2's exact data and network (three sigmoid
+      blocks, 80 noisy points, loss of the generating parameters 0.0449). Every experiment
+      runs right here in the page.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>1. The Learning Rate You Never Chose</h2>
+<ul>
+  <li>Recall the update: every parameter moves against its gradient, and the learning rate
+      $\alpha$ scales the move: $w \leftarrow w - \alpha \, \nabla \mathcal{L}$.</li>
+  <li>In the panel below, pick a learning rate and press <b>run</b>. Each run adds one
+      loss curve to the plot (the epoch axis is logarithmic, and the dashed line is the loss
+      of the generating parameters). Then change the rate and run again. Try 0.01, then
+      0.25, then 2, then 4.</li>
+  <li>What you should find on this network:
+    <ul>
+      <li>$\alpha = 0.01$: reaches the dashed line after roughly 5,000 epochs. Nothing wrong,
+          just slow: each step is tiny, so it takes many.</li>
+      <li>$\alpha = 0.25$ (the series default): about 200 epochs. Comfortable.</li>
+      <li>$\alpha = 2$: about 26 epochs. Our default was more careful than it needed to
+          be, on this loss surface.</li>
+      <li>$\alpha = 4$: the loss <b>explodes</b>. Each step overshoots so badly that the
+          next gradient is bigger than the last, and the run leaves the plot within a few
+          epochs. This is the cliff, and everyone who trains models learns to respect it.</li>
+    </ul>
+  </li>
+  <li>So the learning rate is a trade with a hard edge: the fastest safe rate sits just
+      below the cliff, and the cliff's location depends on the loss surface, which is why
+      there is no universal right number.</li>
+</ul>
+
+<div class="panel">
+  <div class="controls" style="align-items:end;">
+    <label>learning rate
+      <br><select id="rL-lr">
+        <option>0.01</option><option>0.05</option><option selected>0.25</option>
+        <option>1</option><option>2</option><option>4</option>
+      </select></label>
+    <div style="align-self:center;">
+      <button id="rL-run" class="primary">run</button>
+      <button id="rL-clear">clear</button>
+    </div>
+  </div>
+  <div class="score win" id="rL-note" style="min-height:1.6em; margin:6px 0 0;"></div>
+  <div style="display:flex; flex-wrap:wrap; gap:0;">
+    <div id="rL-loss" style="flex:1 1 380px; min-width:320px;"></div>
+    <div id="rL-fit" style="flex:1 1 280px; min-width:260px;"></div>
+  </div>
+</div>
+
+<div class="spacer"></div>
+
+<h2>2. The Valley: Why One Rate Cannot Fit Every Direction</h2>
+<ul>
+  <li>Why does the cliff exist, and why is the best rate so hard to pick? Because a loss surface
+      is rarely a round bowl. It is usually a <b>valley</b>: steep across, nearly flat along.
+      Chapter 2's surface is like this too; some parameters (the slopes $w_j$) bend the loss
+      sharply, others (the heights $v_j$) barely.</li>
+  <li>The panel below shows a two-parameter valley with its loss drawn as contour lines, and
+      the path gradient descent takes from the starting point. Keep <b>momentum at 0</b> for
+      now and play with the learning rate:
+    <ul>
+      <li>the gradient mostly points at the nearest steep wall, not along the valley floor,
+          so the path <b>zig-zags</b> from wall to wall while creeping toward the minimum;</li>
+      <li>raise the rate and the zig-zag widens until the path bounces out entirely: the
+          <b>steep</b> direction sets the cliff;</li>
+      <li>lower it and the bouncing calms, but progress <b>along</b> the valley crawls: the
+          flat direction pays the price.</li>
+    </ul>
+  </li>
+  <li>That is the trap: one number must serve both directions, and the two directions want
+      different numbers.</li>
+</ul>
+
+<div class="panel">
+  <div class="controls">
+    <label>learning rate $\alpha$ <b id="v-o-a"></b>
+      <input id="v-a" type="range" min="0.001" max="0.038" step="0.001" value="0.018" style="--thumb:#eb6834;"></label>
+    <label>momentum $\beta$ <b id="v-o-b"></b>
+      <input id="v-b" type="range" min="0" max="0.99" step="0.01" value="0" style="--thumb:#52514e;"></label>
+  </div>
+  <div class="score">loss after 80 steps: <b id="v-loss"></b><span id="v-note" class="win"></span></div>
+  <div id="v-fig"></div>
+</div>
+
+<div class="spacer"></div>
+
+<h2>3. Momentum: Remember the Direction You Were Going</h2>
+<ul>
+  <li>Look at the zig-zag path again and ask: what information is gradient descent throwing
+      away? <b>Its own recent past.</b> Step after step, the across-the-valley part of the
+      gradient flips sign, while the along-the-valley part points the same way every time.
+      Any method that remembered the last few steps could notice this: the flipping parts
+      would average out, the steady part would add up.</li>
+  <li>That method is <b>momentum</b>. Keep a running <b>velocity</b> $z$: each step, fold
+      the new gradient into the velocity, then move along the velocity:</li>
+</ul>
+
+$$z \leftarrow \beta z + \nabla \mathcal{L}, \qquad w \leftarrow w - \alpha z$$
+
+<ul>
+  <li>$\beta$ is how much of the old velocity survives each step ($\beta = 0$ is plain
+      gradient descent). Now look at the valley again and <b>raise $\beta$ toward 0.9</b>:
+    <ul>
+      <li>the wall-to-wall components of the gradient keep flipping sign, so inside the
+          running velocity they <b>cancel themselves out</b>: the zig-zag fades;</li>
+      <li>the along-the-valley component always points the same way, so it
+          <b>accumulates</b>: the crawl becomes a roll;</li>
+      <li>push $\beta$ to 0.99 and the ball has too much memory: it <b>overshoots</b> the
+          minimum and swings back and forth for a long while.</li>
+    </ul>
+  </li>
+  <li>So when does momentum help, and when does it hurt?
+    <ul>
+      <li><b>Helps</b> whenever the surface is a valley, which is nearly always: the deeper
+          and narrower the valley, the bigger the win. It also lets you use learning rates
+          that would explode without it (try $\alpha = 0.03$ with $\beta = 0$, then with
+          $\beta = 0.8$): the memory smooths the bouncing that causes the explosion.</li>
+      <li><b>Hurts</b> when $\beta$ is too high for the surface: the ball overshoots and
+          swings, and the swinging can be slower than the crawl it replaced. $\beta$ is one
+          more number to get right; 0.9 is the standard default because it behaves well on
+          most surfaces, not because it is always best.</li>
+    </ul>
+  </li>
+  <li>You will race momentum against plain gradient descent on the real network in
+      section 6. From our own runs: $\beta = 0.9$ at $\alpha = 0.25$ reaches the dashed
+      line about eight times faster.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>4. Minibatches: Does Every Step Need All the Data?</h2>
+<ul>
+  <li>A different question now, about <b>cost</b>. Every step so far computed the gradient
+      using <b>all 80 points</b>. With 80 points that is nothing; with eighty million it
+      would be everything: one single step would mean a full pass over the dataset, and
+      training takes thousands of steps.</li>
+  <li>The observation that saves deep learning: a small random sample of points gives a
+      <b>rough estimate of the same gradient</b> at a fraction of the work. The average
+      direction over 8 random points is not the true gradient, but it points roughly the
+      right way, and it costs a tenth as much. Training on such samples is called
+      <b>minibatch</b> training (the whole approach: stochastic gradient descent).</li>
+  <li>The fair comparison is per unit of work: one pass through the data buys either one
+      exact 80-point step or ten rough 8-point steps. Which is worth more? On this network,
+      the ten rough steps, by a wide margin: they reach the dashed line in about a tenth of
+      the passes. Cheap approximate steps, taken often, beat expensive exact steps taken
+      rarely.</li>
+  <li>The price is <b>noise</b>: a minibatch loss curve wobbles on the way down, because
+      every step follows a rough estimate. You will see the wobble in section 6.</li>
+  <li>When is full batch the right call? When the dataset is small enough to afford it,
+      which is exactly why this series could use it for six chapters. Almost no real
+      dataset is.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>5. Adam: a Step Size for Every Parameter</h2>
+<ul>
+  <li>Momentum fixed the zig-zag, but one thing about the valley is still unsolved. The
+      whole problem was that <b>different directions want different learning rates</b>, and
+      momentum still uses a single $\alpha$ for every parameter. Can each parameter have
+      its own?</li>
+  <li>That is Adam's question, and its answer is to learn the rates <b>from the gradients
+      themselves</b>. For each parameter, Adam keeps two running averages:
+    <ul>
+      <li>the average <b>gradient</b> $m$: which way this parameter has been pushed lately
+          (this is momentum's velocity, under a different name);</li>
+      <li>the average <b>squared gradient</b> $s$: how <em>big</em> this parameter's pushes
+          tend to be, a measure of how steep its direction is.</li>
+    </ul>
+  </li>
+  <li>Each parameter then steps by the direction over the typical size:</li>
+</ul>
+
+$$w \leftarrow w - \alpha \, \frac{m}{\sqrt{s}}$$
+
+<ul>
+  <li>Read the division as a correction: a parameter with big gradients (a steep direction)
+      gets its steps <b>shrunk</b>, one with small gradients (a flat direction) gets its
+      steps <b>boosted</b>. The valley is reshaped into something much closer to a round
+      bowl, one parameter at a time, and the round bowl is the one surface where a single
+      $\alpha$ was always fine.</li>
+  <li>So when Adam, and when momentum?
+    <ul>
+      <li><b>Adam</b> is the convenient default of modern practice: it usually works at its
+          standard settings with no tuning, which matters when a training run costs hours.
+          Note its $\alpha$ has a different meaning (the division changes the scale), so
+          its defaults are small numbers like 0.01.</li>
+      <li><b>Momentum</b> is the simpler machine (one running average where Adam keeps
+          two), and on some problems a carefully tuned momentum run ends at a slightly
+          better answer than Adam. When the last bit of quality matters, people tune both
+          and race them.</li>
+      <li>Neither is free: Adam keeps two extra numbers per parameter, momentum one. For our
+          10-parameter network that is nothing; for a billion-parameter model it is real
+          memory.</li>
+    </ul>
+  </li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>6. The Race</h2>
+<ul>
+  <li>Now that all the runners have been introduced, race them yourself. Everything runs on
+      chapter 2's data and network; each run adds a labeled loss curve. A course worth
+      running, in order:
+    <ol>
+      <li>gradient descent, $\alpha = 0.25$, all 80 points (the series default: the one to beat);</li>
+      <li>momentum, $\alpha = 0.25$ (the zig-zag cancelled: about eight times faster);</li>
+      <li>Adam, $\alpha = 0.05$ (the reshaped bowl);</li>
+      <li>gradient descent, $\alpha = 0.25$, batch of 8 (watch the wobble, and where it lands per pass);</li>
+      <li>gradient descent, $\alpha = 4$ (over the cliff, so you know what it looks like).</li>
+    </ol>
+  </li>
+  <li>Note where every successful run ends: on the <b>same</b> dashed line. The toolkit
+      changes how fast you descend, not where you arrive; keep that in mind for section 8.</li>
+</ul>
+
+<div class="panel">
+  <div class="controls" style="align-items:end;">
+    <label>method
+      <br><select id="rR-opt">
+        <option value="gd">gradient descent</option>
+        <option value="mom">momentum (β = 0.9)</option>
+        <option value="adam">Adam</option>
+      </select></label>
+    <label>learning rate
+      <br><select id="rR-lr">
+        <option>0.01</option><option>0.05</option><option selected>0.25</option>
+        <option>1</option><option>2</option><option>4</option>
+      </select></label>
+    <label>batch
+      <br><select id="rR-batch">
+        <option value="80" selected>all 80 points</option>
+        <option value="8">8 points</option>
+      </select></label>
+    <div style="align-self:center;">
+      <button id="rR-run" class="primary">run</button>
+      <button id="rR-clear">clear</button>
+    </div>
+  </div>
+  <div class="score win" id="rR-note" style="min-height:1.6em; margin:6px 0 0;"></div>
+  <div style="display:flex; flex-wrap:wrap; gap:0;">
+    <div id="rR-loss" style="flex:1 1 380px; min-width:320px;"></div>
+    <div id="rR-fit" style="flex:1 1 280px; min-width:260px;"></div>
+  </div>
+</div>
+
+<div class="spacer"></div>
+
+<h2>7. Which One Should You Use?</h2>
+
+<table class="count">
+  <tr><th>tool</th><th>the question it answers</th><th>what it keeps</th><th>what to watch</th></tr>
+  <tr><td>learning rate</td><td>how big is a step</td><td>nothing</td><td>the cliff sits just above the best rate</td></tr>
+  <tr><td>momentum</td><td>can the path remember its direction</td><td>one velocity per parameter</td><td>too much memory overshoots and swings</td></tr>
+  <tr><td>minibatches</td><td>must a step see all the data</td><td>nothing</td><td>the loss curve wobbles; steps are estimates</td></tr>
+  <tr><td>Adam</td><td>can each parameter have its own rate</td><td>two averages per parameter</td><td>its α is on a different scale; defaults are small</td></tr>
+</table>
+
+<ul>
+  <li>The practical rules most people follow, and why:
+    <ul>
+      <li><b>Minibatches: always</b>, on real data. Training on the full batch is
+          something only a tiny teaching dataset like this one allows.</li>
+      <li><b>Adam at its defaults first.</b> It is the first tool to reach for because
+          it usually just works, and your time matters more than a small speed
+          difference.</li>
+      <li><b>Momentum when you can afford to tune</b>, or when Adam's two extra numbers
+          per parameter are too much memory, or when a tuned run's final quality matters
+          more than convenience.</li>
+      <li><b>Plain gradient descent</b> mostly for understanding, which is what this series
+          used it for: every idea in chapters 1 to 5 was visible without the toolkit in the
+          way.</li>
+    </ul>
+  </li>
+  <li>And whichever you choose, the learning rate is still the number to check first when a
+      run explodes or crawls. The tools reshape the problem; they do not remove it.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>8. What the Toolkit Cannot Do</h2>
+<ul>
+  <li>One more experiment, and it matters. Recall chapter 3's deep network with the small
+      starting weights, the one that gets stuck at a loss of about 0.15 while the recipe
+      sits at 0.047. Can the toolkit save it?
+    <ul>
+      <li>plain gradient descent, 400,000 epochs: stuck at 0.154;</li>
+      <li>momentum, $\beta = 0.9$: stuck at 0.153;</li>
+      <li>Adam: stuck at 0.153.</li>
+    </ul>
+  </li>
+  <li>It cannot. That network is not moving down slowly, it is moving down <b>to the wrong
+      place</b>: from that starting point, every downhill path leads to the same poor answer,
+      and a faster method just gets there faster.</li>
+  <li>The lesson, worth keeping: <b>the toolkit makes descent faster, not wiser.</b> Where
+      the descent ends up is decided by the loss surface and the starting point, and fixing
+      those needs different ideas (better starting weights, and layers that keep gradients
+      healthy). Those ideas get their turn when the networks grow deeper.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>(Optional) The Toolkit in Code</h2>
+
+<p>Momentum in numpy is two lines more than gradient descent (one velocity per parameter
+array; here for chapter 2's network):</p>
+
+<pre>lr, beta = 0.25, 0.9
+zw = np.zeros_like(w); zb = np.zeros_like(b); zv = np.zeros_like(v)
+
+for epoch in range(20_000):
+    gw, gb, gv = gradients(w, b, v, x, y)     # as in chapter 2
+    zw = beta*zw + gw;  w -= lr*zw
+    zb = beta*zb + gb;  b -= lr*zb
+    zv = beta*zv + gv;  v -= lr*zv</pre>
+
+<p>Minibatch training shuffles the points each pass and steps on each slice:</p>
+
+<pre>B = 8
+for epoch in range(2_000):
+    order = np.random.permutation(len(x))
+    for i in range(0, len(x), B):
+        batch = order[i:i+B]
+        gw, gb, gv = gradients(w, b, v, x[batch], y[batch])
+        w -= lr*gw;  b -= lr*gb;  v -= lr*gv</pre>
+
+<p>In PyTorch, the toolkit is one argument:</p>
+
+<pre>optimizer = torch.optim.SGD(model.parameters(), lr=0.25)                 # plain
+optimizer = torch.optim.SGD(model.parameters(), lr=0.25, momentum=0.9)   # momentum
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01)                # Adam</pre>
+
+<div class="spacer"></div>
+
+<h2>Chapter Highlights</h2>
+<ol>
+  <li>The learning rate is a trade with a cliff: too small crawls, too big explodes, and the
+      cliff's location depends on the loss surface.</li>
+  <li>Loss surfaces are valleys: steep across, flat along. One rate cannot serve both
+      directions, and that problem is what the rest of the toolkit goes after.</li>
+  <li>Momentum keeps a running velocity: zig-zag components cancel, along-the-valley
+      components accumulate. Eight times faster on our own chapter 2 network.</li>
+  <li>Minibatches buy many cheap noisy steps for the price of one exact step, and win per
+      pass through the data. Real training is minibatch training.</li>
+  <li>Adam gives each parameter its own step size from the gradient's history, flattening
+      the valley one direction at a time.</li>
+  <li>The toolkit makes descent faster, not wiser: chapter 3's stuck network stays stuck.
+      Where you start from, and the shape of the surface, are different problems.</li>
+</ol>
+
+<footer>
+Previous: <a href="chapter5.html">Chapter 5: Generalization</a>.
+Next: convolutional networks, where chapter 3's reuse idea is applied to images.
+</footer>
+
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const sig = z => 1/(1 + Math.exp(-z));
+const C = { orange:"#eb6834", red:"#c1121f", green:"#3a9d6e", gold:"#c8930c", plum:"#a94f86",
+            purple:"#8a63c4", blue:"#2a78d6", muted:"#898781", surface:"#fcfcfb",
+            grid:"#e1e0d9", axis:"#c3c2b7", ink:"#0b0b0b", ink2:"#52514e" };
+const FONT = { family:'system-ui, -apple-system, "Segoe UI", sans-serif', color:C.ink2, size:12 };
+const CONF = {responsive:true, displayModeBar:false};
+function paintSlider(el) {
+  const min = +el.min, max = +el.max, v = +el.value;
+  const pct = (v - min) / (max - min) * 100;
+  const color = getComputedStyle(el).getPropertyValue("--thumb") || "#52514e";
+  el.style.background = `linear-gradient(to right, ${color} ${pct}%, var(--grid) ${pct}%)`;
+}
+
+/* ---- chapter 2's exact data ---------------------------------------------- */
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rnd = mulberry32(11);
+function gauss() {
+  let u = 0, v = 0;
+  while (!u) u = rnd();
+  while (!v) v = rnd();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+const SEC = { l:[-2, 0, 2], w:[2, 2.5, 1.5], v:[1.2, -1.8, 0.9], c:0.4 };
+const N = 80, SIGMA = 0.2, xd = [], yd = [];
+let FLOOR = 0;
+for (let i = 0; i < N; i++) {
+  const x = -6 + 12*rnd(), e = gauss();
+  let f = SEC.c;
+  for (let j = 0; j < 3; j++) f += SEC.v[j]*sig(SEC.w[j]*(x - SEC.l[j]));
+  xd.push(x); yd.push(f + SIGMA*e); FLOOR += (SIGMA*e)**2;
+}
+FLOOR /= N;
+const NX = 300, xg = [];
+for (let i = 0; i < NX; i++) xg.push(-6 + 12*i/(NX-1));
+
+/* ---- the race panels (section 1: gradient descent only; section 6: all) - */
+const INIT = { w:[1,1,1], b:[3,0,-3], v:[0.3,-0.3,0.3] };
+const MAXP = 8000;                    // passes through the data
+const RUNCOLORS = [C.purple, C.orange, C.green, C.red, C.gold, C.blue];
+function lossOf(P) {
+  let s = 0;
+  for (let i = 0; i < N; i++) {
+    let u = P.c;
+    for (let j = 0; j < 3; j++) u += P.v[j]*sig(P.w[j]*xd[i] + P.b[j]);
+    s += (u - yd[i])**2;
+  }
+  return s/N;
+}
+function setC(P, idx) {
+  let s = 0;
+  for (const i of idx) {
+    let u = 0;
+    for (let j = 0; j < 3; j++) u += P.v[j]*sig(P.w[j]*xd[i] + P.b[j]);
+    s += yd[i] - u;
+  }
+  P.c = s/idx.length;
+}
+function gradsOn(P, idx) {
+  const gw = [0,0,0], gb = [0,0,0], gv = [0,0,0];
+  const n = idx.length;
+  setC(P, idx);
+  for (const i of idx) {
+    const x = xd[i], a = [];
+    let u = P.c;
+    for (let j = 0; j < 3; j++) { a[j] = sig(P.w[j]*x + P.b[j]); u += P.v[j]*a[j]; }
+    const err = u - yd[i];
+    for (let j = 0; j < 3; j++) {
+      gv[j] += 2/n*err*a[j];
+      const da = 2/n*err*P.v[j]*a[j]*(1 - a[j]);
+      gw[j] += da*x; gb[j] += da;
+    }
+  }
+  return [gw, gb, gv];
+}
+function raceInit(pre, fixed) {
+  let runCount = 0, running = false;
+  const shufRnd = mulberry32(77);
+  Plotly.newPlot(pre + "-loss", [
+    { x:[1, MAXP], y:[FLOOR, FLOOR], mode:"lines", name:"the recipe",
+      line:{color:C.muted, width:1, dash:"dot"}, hoverinfo:"skip" },
+  ], {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:340,
+    margin:{l:50, r:15, t:26, b:40}, showlegend:true,
+    legend:{orientation:"h", x:0, y:1.09, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)", font:{size:11}},
+    xaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+           title:{text:"passes through the data"}, type:"log", range:[0, Math.log10(MAXP)]},
+    yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+           range:[0, 0.75]},
+  }, CONF);
+  Plotly.newPlot(pre + "-fit", [
+    { x:xd, y:yd, mode:"markers", name:"data",
+      marker:{color:C.muted, size:5, opacity:0.75}, hoverinfo:"skip" },
+    { x:xg, y:[], mode:"lines", name:"latest run's fit",
+      line:{color:C.purple, width:2.6}, hoverinfo:"skip" },
+  ], {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:340,
+    margin:{l:40, r:15, t:26, b:40}, showlegend:true,
+    legend:{orientation:"h", x:0, y:1.09, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)", font:{size:11}},
+    xaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis, title:{text:"x"}},
+    yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis, range:[-3, 2.4]},
+  }, CONF);
+
+  function runRace() {
+    if (running) return;
+    running = true;
+    $(pre + "-run").disabled = true;
+    const opt = fixed.opt || $(pre + "-opt").value;
+    const lr = +$(pre + "-lr").value;
+    const batch = fixed.batch || +$(pre + "-batch").value;
+    const name = (opt === "gd" ? "gradient descent" : opt === "mom" ? "momentum" : "Adam") +
+      `, α=${lr}` + (batch < N ? `, batch ${batch}` : "");
+    const color = RUNCOLORS[runCount % RUNCOLORS.length];
+    runCount++;
+    const P = { w:INIT.w.slice(), b:INIT.b.slice(), v:INIT.v.slice(), c:0 };
+    const Z = { w:[0,0,0], b:[0,0,0], v:[0,0,0] };
+    const M = { w:[0,0,0], b:[0,0,0], v:[0,0,0] };
+    const S = { w:[0,0,0], b:[0,0,0], v:[0,0,0] };
+    const BETA = 0.9, B2 = 0.999;
+    let pass = 0, t = 0, diverged = false;
+    const px = [], py = [];
+    Plotly.addTraces(pre + "-loss", [{ x:[], y:[], mode:"lines", name,
+      line:{color, width:2}, hoverinfo:"skip" }]);
+    const traceIdx = runCount;          // trace 0 is the floor line
+    $(pre + "-note").textContent = "";
+    (function chunk() {
+      const upTo = Math.min(pass + (pass < 100 ? 5 : 200), MAXP);
+      while (pass < upTo && !diverged) {
+        let order = [...Array(N).keys()];
+        if (batch < N) {
+          for (let i = N - 1; i > 0; i--) {
+            const j = Math.floor(shufRnd()*(i + 1));
+            [order[i], order[j]] = [order[j], order[i]];
+          }
+        }
+        for (let s0 = 0; s0 < N; s0 += batch) {
+          const idx = order.slice(s0, s0 + batch);
+          const [gw, gb, gv] = gradsOn(P, idx);
+          t++;
+          for (let j = 0; j < 3; j++) {
+            if (opt === "gd") {
+              P.w[j] -= lr*gw[j]; P.b[j] -= lr*gb[j]; P.v[j] -= lr*gv[j];
+            } else if (opt === "mom") {
+              Z.w[j] = BETA*Z.w[j] + gw[j]; P.w[j] -= lr*Z.w[j];
+              Z.b[j] = BETA*Z.b[j] + gb[j]; P.b[j] -= lr*Z.b[j];
+              Z.v[j] = BETA*Z.v[j] + gv[j]; P.v[j] -= lr*Z.v[j];
+            } else {
+              const upd = (Pk, g, Mk, Sk) => {
+                Mk[j] = BETA*Mk[j] + (1 - BETA)*g;
+                Sk[j] = B2*Sk[j] + (1 - B2)*g*g;
+                Pk[j] -= lr*(Mk[j]/(1 - Math.pow(BETA, t))) /
+                         (Math.sqrt(Sk[j]/(1 - Math.pow(B2, t))) + 1e-8);
+              };
+              upd(P.w, gw[j], M.w, S.w);
+              upd(P.b, gb[j], M.b, S.b);
+              upd(P.v, gv[j], M.v, S.v);
+            }
+          }
+        }
+        pass++;
+        setC(P, [...Array(N).keys()]);
+        const L = lossOf(P);
+        if (!isFinite(L) || L > 1e6) { diverged = true; break; }
+        if (pass <= 100 || pass % 10 === 0 || pass === MAXP) {
+          px.push(pass); py.push(Math.min(L, 0.75));
+        }
+      }
+      Plotly.restyle(pre + "-loss", {x: [px], y: [py]}, [traceIdx]);
+      if (diverged) {
+        $(pre + "-note").textContent = `(${name}: the loss left the plot. That is the cliff.)`;
+        finish();
+        return;
+      }
+      if (pass >= MAXP) { finish(); return; }
+      requestAnimationFrame(chunk);
+    })();
+    function finish() {
+      const ys = xg.map(x => {
+        let u = P.c;
+        for (let j = 0; j < 3; j++) u += P.v[j]*sig(P.w[j]*x + P.b[j]);
+        return u;
+      });
+      Plotly.restyle(pre + "-fit", {y: [ys], "line.color": [diverged ? C.axis : color]}, [1]);
+      running = false;
+      $(pre + "-run").disabled = false;
+    }
+  }
+  $(pre + "-run").addEventListener("click", runRace);
+  $(pre + "-clear").addEventListener("click", () => {
+    if (running) return;
+    const gd = $(pre + "-loss");
+    while (gd.data.length > 1) Plotly.deleteTraces(pre + "-loss", 1);
+    runCount = 0;
+    $(pre + "-note").textContent = "";
+    Plotly.restyle(pre + "-fit", {y: [[]]}, [1]);
+  });
+}
+raceInit("rL", {opt: "gd", batch: 80});
+raceInit("rR", {});
+
+/* ---- the valley panel ---------------------------------------------------- */
+(function valleyPanel() {
+  const L1 = 1, L2 = 100;             // curvatures: flat along, steep across
+  const W0 = [-2.6, 0.26];
+  const STEPS = 80;
+  const f = (a, b) => 0.5*(L1*a*a + L2*b*b);
+
+  // contour background
+  const gx = [], gy = [];
+  for (let i = 0; i <= 60; i++) gx.push(-3 + 6*i/60);
+  for (let i = 0; i <= 60; i++) gy.push(-0.45 + 0.9*i/60);
+  const z = gy.map(b => gx.map(a => f(a, b)));
+  Plotly.newPlot("v-fig", [
+    { x:gx, y:gy, z, type:"contour", showscale:false,
+      colorscale:[[0, "#ffffff"], [1, "#e8e2d6"]], ncontours:16,
+      contours:{coloring:"lines"}, line:{color:C.axis, width:1}, hoverinfo:"skip" },
+    { x:[], y:[], mode:"lines+markers", name:"the path",
+      line:{color:C.purple, width:2}, marker:{size:4, color:C.purple}, hoverinfo:"skip" },
+    { x:[0], y:[0], mode:"markers", name:"minimum",
+      marker:{size:10, color:C.ink2, symbol:"x"}, hoverinfo:"skip" },
+    { x:[W0[0]], y:[W0[1]], mode:"markers", name:"start",
+      marker:{size:9, color:C.orange}, hoverinfo:"skip" },
+  ], {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:360,
+    margin:{l:45, r:15, t:26, b:40}, showlegend:true,
+    legend:{orientation:"h", x:0, y:1.09, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)", font:{size:11}},
+    xaxis:{gridcolor:C.grid, zeroline:false, linecolor:C.axis, tickcolor:C.axis,
+           title:{text:"flat direction"}, range:[-3, 3], fixedrange:true},
+    yaxis:{gridcolor:C.grid, zeroline:false, linecolor:C.axis, tickcolor:C.axis,
+           title:{text:"steep direction"}, range:[-0.45, 0.45], fixedrange:true},
+  }, CONF);
+
+  function redraw() {
+    const a = +$("v-a").value, b = +$("v-b").value;
+    $("v-o-a").textContent = a.toFixed(3);
+    $("v-o-b").textContent = b.toFixed(2);
+    let w = W0.slice(), zv = [0, 0];
+    const px = [w[0]], py = [w[1]];
+    let exploded = false;
+    for (let s = 0; s < STEPS; s++) {
+      const g = [L1*w[0], L2*w[1]];
+      zv = [b*zv[0] + g[0], b*zv[1] + g[1]];
+      w = [w[0] - a*zv[0], w[1] - a*zv[1]];
+      px.push(w[0]); py.push(w[1]);
+      if (Math.abs(w[0]) > 40 || Math.abs(w[1]) > 40) { exploded = true; break; }
+    }
+    Plotly.restyle("v-fig", {x: [px], y: [py]}, [1]);
+    const L = f(w[0], w[1]);
+    $("v-loss").textContent = exploded ? "exploding" : L < 1e-4 ? L.toExponential(1) : L.toFixed(4);
+    $("v-note").textContent =
+      exploded ? "  (the steep direction threw the path out: lower the rate or raise the memory)"
+      : (b > 0.95 ? "  (that much memory rings: watch the loops around the minimum)" : "");
+    paintSlider($("v-a")); paintSlider($("v-b"));
+  }
+  $("v-a").addEventListener("input", redraw);
+  $("v-b").addEventListener("input", redraw);
+  redraw();
+})();
+</script>
+<nav class="side" id="sidenav"></nav>
+<script src="nav.js"></script>
+</body>
+</html>

@@ -15,4 +15,5 @@ The demo above is from Chapter 2: a network with three sigmoid hidden nodes lear
 3. [A second hidden layer](https://acycliq.github.io/neural_nets_from_scratch/chapter3.html): when one hidden layer cannot fit the shape, go wider or go deeper, and count the parameters either way.
 4. [Classification with softmax](https://acycliq.github.io/neural_nets_from_scratch/chapter4.html): three classes, softmax, cross-entropy, and two plots that learn together: a decision-region map and a probability triangle.
 5. [Generalization](https://acycliq.github.io/neural_nets_from_scratch/chapter5.html): hold points back, watch a big network win on the training data and lose on the test data, then overfit by hand and pay for it.
+6. [The training toolkit](https://acycliq.github.io/neural_nets_from_scratch/chapter6.html): learning rates, momentum, minibatches and Adam, raced against each other on chapter 2's network.
 

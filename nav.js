@@ -8,6 +8,7 @@
     ["chapter3.html", "Chapter 3: A Second Hidden Layer"],
     ["chapter4.html", "Chapter 4: Classification with Softmax"],
     ["chapter5.html", "Chapter 5: Generalization"],
+    ["chapter6.html", "Chapter 6: The Training Toolkit"],
   ];
   const here = location.pathname.split("/").pop() || "index.html";
 
