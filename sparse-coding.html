@@ -468,40 +468,6 @@ def omp(pixel, codebook, n_picks):
 
 <div class="spacer"></div>
 
-<h2>(Optional) From Scores to Probabilities</h2>
-<ul>
-  <li>The looks-like score is not a probability. It becomes one after fixing a model and a
-      question. Write the pixel as a vector $y$ of its 12 brightnesses and gene $g$'s
-      barcode as a vector $c_g$ of 12 zeros and ones; the model of the whole chapter is then
-      $y = C_S \beta + \varepsilon$, where $S$ is the guest list, $C_S$ the matrix with the
-      listed barcodes as columns, $\beta$ their brightnesses, and
-      $\varepsilon \sim \mathcal{N}(0, \sigma^2 I)$ the camera noise.</li>
-  <li><b>Which single gene?</b> For one gene at known brightness $\beta$,
-      $$p(g \mid y) = \operatorname{softmax}_g\!\big(\beta \, \langle y, c_g \rangle / \sigma^2\big)$$
-      where $\langle y, c_g \rangle$ is the dot product, the same "add up the pixel where
-      the barcode glows" as the score's top. This is exact: the only other $g$-dependent
-      term in the likelihood is $\beta^2 \|c_g\|^2$, and $\|c_g\|^2$ counts the
-      barcode's lit cells, 3 for every gene, so it cancels in the softmax (chapter 4's
-      derivation).</li>
-  <li><b>Is gene $g$ present?</b> Weigh every guest list:
-      $$p(S \mid y) \;\propto\; p(S) \int \mathcal{N}\big(y;\, C_S \beta,\ \sigma^2 I\big)\, p(\beta)\, d\beta,
-      \qquad p(g \text{ present} \mid y) = \sum_{S \ni g} p(S \mid y)$$
-      with $p(S)$ a prior on lists ("1 to 3 genes per pixel"), $p(\beta)$ a prior on
-      brightnesses (nonnegative), and the normal density the likelihood of the pixel given
-      that list and those brightnesses; the integral scores the list averaged over
-      brightnesses (closed form for Gaussian $p(\beta)$). Our toy has
-      $1 + 16 + \binom{16}{2} = 137$ lists, so both formulas are exactly computable. OMP
-      is a greedy search for the best single $S$; the sum is what it approximates.</li>
-  <li><b>When to stop?</b> Simulate pure noise and record
-      $\max_g \operatorname{score}(\varepsilon, c_g)$ over many draws. The tallest bar's
-      score maps to the fraction of draws at least as high: the probability that noise alone
-      explains it. Stop when that fraction is not small.</li>
-  <li>Future work: compute the 137 list probabilities live, one probability bar per gene
-      next to the looks-like bars, driven by the noise slider.</li>
-</ul>
-
-<div class="spacer"></div>
-
 <h2>Chapter Highlights</h2>
 <ol>
   <li>Sparse coding: a measurement is a weighted sum of a <b>few</b> pieces from a large known
