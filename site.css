@@ -85,6 +85,10 @@ nav.side .site {
 nav.side a { display: block; color: var(--ink2); text-decoration: none; padding: 4px 0; }
 nav.side a:hover { color: var(--ink); }
 nav.side a.here { color: var(--ink); font-weight: 600; }
+nav.side .part, details.chapnav .part {
+  display: block; margin: 14px 0 2px; font-size: 11px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--muted);
+}
 nav.side .secs { margin: 2px 0 8px; }
 nav.side .secs a { padding: 2px 0 2px 14px; font-size: 12.5px; color: var(--muted); }
 nav.side .secs a:hover { color: var(--ink); }

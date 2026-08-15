@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sparse Coding and Matching Pursuit</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+<meta name="description" content="Interactive notes on sparse coding: read the genes out of a microscope pixel by hand, see least squares fail, and build orthogonal matching pursuit.">
+<meta property="og:title" content="Sparse Coding and Matching Pursuit">
+<meta property="og:description" content="Interactive notes on sparse coding: read the genes out of a microscope pixel by hand, see least squares fail, and build orthogonal matching pursuit.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://acycliq.github.io/neural_nets_from_scratch/sparse-coding.html">
+<meta property="og:image" content="https://acycliq.github.io/neural_nets_from_scratch/assets/demo.gif">
+<meta name="twitter:card" content="summary_large_image">
+<script src="https://cdn.plot.ly/plotly-cartesian-2.35.2.min.js" integrity="sha384-gKF7EaMDoWW1zLWkouldmVWF5jqEKrAswAciW73iNzqlomabVVPO60XkJvL5q/Ie" crossorigin="anonymous"></script>
+<script>
+window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+<link rel="stylesheet" href="site.css">
+<style>
+  .duo { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  .duo > div:first-child { flex: 0 1 250px; min-width: 220px; }
+  .duo > div:last-child { flex: 1 1 380px; min-width: 300px; }
+  .kicker { color: var(--muted); font-size: 13px; font-weight: 700;
+            letter-spacing: .06em; text-transform: uppercase; margin: 55px 0 -48px; }
+  select { font: inherit; color: var(--ink2); padding: 4px 6px; border: 1px solid var(--axis);
+           border-radius: 5px; background: #fff; max-width: 100%; }
+</style>
+</head>
+<body>
+<main>
+<noscript><p>The interactive panels on this page need JavaScript. The text still reads without it, but the plots and buttons stay empty.</p></noscript>
+
+<p class="kicker">Part II: Topics in ML</p>
+<h1>Sparse Coding and Matching Pursuit</h1>
+
+<div class="spacer"></div>
+
+<h2>Learning Objectives</h2>
+<ul>
+  <li>Describe the sparse coding problem: a measurement explained by a <b>few</b> items from a large known collection</li>
+  <li>Explain why least squares on the whole collection fails when unknowns outnumber measurements</li>
+  <li>Recover two overlapping genes from one pixel by hand, by peeling off the strongest match first</li>
+  <li>Show why one-at-a-time peeling gets the amounts wrong when the pieces overlap</li>
+  <li>State the one-line fix that turns matching pursuit into <b>orthogonal</b> matching pursuit</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Motivation</h2>
+<ul>
+  <li>In Part I, every prediction was a sum of simple blocks, and <b>training shaped the blocks</b>.
+      This chapter flips the problem: the blocks are handed to us, fixed, in a big labelled box,
+      and the question becomes <b>which few of them are present</b>, and in what amounts.</li>
+  <li>That question has a name, <b>sparse coding</b>, and it appears whenever a measurement is a
+      mixture of a small number of known signatures: which instruments are playing in this chord,
+      which materials are in this spectrum, which genes are in this pixel.</li>
+  <li>We will use the gene version, because it is real: this chapter's algorithm, run once per
+      pixel, is how real spatial gene-expression pipelines decode their images.</li>
+  <li>The plan: solve an easy pixel by eye, peel apart a hard one by hand, watch chapter 1's
+      least squares fail at the same task, and then meet the two algorithms we will have
+      accidentally invented along the way.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<!-- ============================================================ 1. setup -->
+<h2>1. Every Gene Gets a Barcode</h2>
+
+<ul>
+  <li>The experiment, in two sentences: each gene's mRNA molecules are tagged in the tissue,
+      and the same tissue is photographed over several <b>rounds</b>, in several colour
+      <b>channels</b> per round. The tags are designed so that each gene lights up in its own
+      sequence of colours: one colour per round.</li>
+  <li>So each gene has a <b>barcode</b>: a small rounds × channels grid showing which channel
+      lights up in each round. Our codebook uses <b>3 rounds and 4 channels</b>: in each round (column),
+      exactly one channel (row) lights up.</li>
+  <li style="font-size:12.5px; color:var(--muted);">A confession about the word: strictly, the
+      barcode is the gene's <i>dye sequence</i> (Plp1's below is dye 1 → dye 2 → dye 3), and
+      the grid is that sequence as the camera sees it, each channel being tuned to one dye. We
+      use "barcode" for the grid throughout, because the grid is the form all the math
+      touches. Real dyes also spill a little into neighbouring channels; ignored here.</li>
+  <li>Here is the full <b>codebook</b> for a made-up panel of 16 genes, each lit cell painted
+      in its dye's colour, so every barcode reads as a colour sequence (hover any cell):</li>
+</ul>
+
+<div class="panel">
+  <div id="cb-fig"></div>
+</div>
+
+<ul>
+  <li>Two things to notice before moving on:
+    <ul>
+      <li>A barcode is <b>12 numbers</b> (3 × 4), but underneath it is only 3 choices of dye,
+          so with 4 dyes and 3 rounds there are just $4^3 = 64$ possible barcodes. With 16
+          genes (real panels use hundreds), barcodes are forced to <b>share dyes in some
+          rounds</b>. Plp1 and Sst above agree in rounds 1 and 3 and differ only in round 2.
+          Keep those two in mind.</li>
+      <li>A <b>pixel</b> of the photographed tissue is also 12 numbers: its brightness in each
+          round and channel. If one gene's molecule sits at that pixel, the pixel should look
+          like that gene's barcode, scaled by how bright the tag is.</li>
+    </ul>
+  </li>
+  <li>The model, then, is chapter 1's weighted sum with the blocks fixed:
+      $\;\text{pixel} \approx \beta_1\,\text{barcode}_{g_1} + \beta_2\,\text{barcode}_{g_2} + \cdots\;$
+      where only a <b>few</b> $\beta$'s should be nonzero, and none should be negative
+      (a gene cannot glow by a negative amount).</li>
+  <li>The task for the rest of the chapter: given a pixel's 12 numbers, recover <b>which genes</b>
+      and <b>how bright</b>.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<!-- ============================================================ 2. easy -->
+<h2>2. The Easy Pixel</h2>
+
+<ul>
+  <li>Here is a pixel from our imaginary tissue, drawn with the same colour code as the
+      codebook: each row keeps its channel's dye colour, and the <b>depth</b> of the colour is
+      the measured brightness. The camera measures amounts of light, so a pixel is a grid of
+      12 brightnesses. <b>Your task: find its gene by eye.</b> Scroll between the pixel and
+      the codebook above until you spot the matching barcode.</li>
+  <li>Then press the button, which does the same thing with arithmetic: for every gene it
+      computes a <b>looks-like score</b>, measuring how well the pixel's pattern matches that
+      barcode (1 = same pattern, 0 = nothing in common).</li>
+</ul>
+
+<div class="panel">
+  <div class="duo">
+    <div id="ez-fig"></div>
+    <div>
+      <div style="margin:4px 0 8px;"><button id="ez-go" class="primary">score every gene</button></div>
+      <div id="ez-bars"></div>
+    </div>
+  </div>
+</div>
+
+<ul>
+  <li>One bar towers and the rest are noise: this pixel is <b>Gad1</b>, at brightness about 5.
+      The runner-up scores around 0.35, and only because it happens to share a dye with Gad1
+      in one round.</li>
+  <li>If every pixel looked like this, the chapter would end here: <b>compare against each
+      barcode, keep the best match</b>. No fitting, no training, done.</li>
+</ul>
+
+<h3>What did the button just compute?</h3>
+<ul>
+  <li>The score is simpler than it sounds. Pick any gene below and follow three steps:
+    <ol>
+      <li><b>Lay that gene's barcode over the pixel.</b> Its 3 lit cells are outlined.</li>
+      <li><b>Add up the pixel's brightness inside the outlines.</b> The matching gene's
+          outlines sit exactly on the pixel's bright cells and collect everything; a wrong
+          gene's outlines land mostly on dark cells and collect almost nothing. (Try Cck: it
+          shares one dye with Gad1, so it collects exactly one bright cell.)</li>
+      <li><b>Divide by the two lengths</b> (the pixel's overall brightness and the barcode's
+          size), so a bright pixel does not out-score a dim one just by being bright. The
+          result lives between $-1$ and $1$, and it only reaches $1$ when the pixel is the
+          barcode times a single brightness.</li>
+    </ol>
+  </li>
+</ul>
+
+<div class="panel">
+  <div class="controls" style="align-items:center;">
+    <label style="flex:0 1 240px;">score the easy pixel against
+      <select id="sc-g"></select></label>
+    <div class="score" style="flex:1; min-width:280px;" id="sc-out"></div>
+  </div>
+  <div id="sc-fig" style="max-width:400px; margin:0 auto;"></div>
+</div>
+
+<ul>
+  <li>In symbols, with the sums running over all 12 cells:
+      $\text{score} = \dfrac{\sum \text{pixel} \times \text{barcode}}
+      {\sqrt{\sum \text{pixel}^2}\sqrt{\sum \text{barcode}^2}}$. This has a standard name:
+      the <b>cosine similarity</b> of the two grids. Because our barcode cells are 0 or 1,
+      the top is literally "add up the pixel where the barcode glows".</li>
+  <li>If it reminds you of the <b>Pearson correlation</b>, it should: Pearson is this same
+      formula applied after subtracting each grid's mean. Neither is better in general; they
+      answer different questions:</li>
+</ul>
+
+<table class="count">
+  <tr><th></th><th>cosine similarity</th><th>Pearson correlation</th></tr>
+  <tr><td>recipe</td>
+      <td>the formula above, on the raw values</td>
+      <td>the same formula, after subtracting each grid's mean</td></tr>
+  <tr><td>question it answers</td>
+      <td>"is one a scaled copy of the other?"</td>
+      <td>"do the two rise and fall together, around their own averages?"</td></tr>
+  <tr><td>use it when</td>
+      <td>zero is meaningful and scale is the question</td>
+      <td>baselines are arbitrary and only co-variation matters (height vs weight)</td></tr>
+</table>
+
+<ul>
+  <li><b>Here, cosine is the right one</b>, for two reasons. First, our zero is physical: zero
+      means "no light", and our model says a one-gene pixel <i>is</i> a scaled copy of its
+      barcode, which is exactly the question cosine asks. Second, cosine is the score that
+      matches least squares: after section 5's re-fit, the leftover's cosine with every picked
+      gene is <i>exactly zero</i>, and that zero is the "orthogonal" in the algorithm's name.</li>
+  <li><b>Pearson would be the wrong one here</b>, not just an equivalent alternative. Its
+      mean-subtraction shifts the barcode's 0s and 1s, and a perfectly explained pixel would
+      still score about $-0.19$ against its own picked genes instead of zero: a correct answer
+      that looks unfinished. Save Pearson for the questions it was built for, where each
+      variable's baseline is arbitrary and only the co-movement carries information.</li>
+  <li>So, to be exact: <b>every bar plot on this page, and the selection score inside
+      matching pursuit and OMP, is cosine similarity, not Pearson correlation</b>. (People
+      often say "correlation" loosely for both; when this chapter says score, it means
+      cosine.) It is the engine of the whole chapter: the algorithm we are building picks
+      genes greedily by this score, first on the pixel, then on each leftover.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<!-- ============================================================ 3. peel -->
+<h2>3. The Hard Pixel: Peel It Apart</h2>
+
+<ul>
+  <li>Tissue is crowded, and two molecules from <b>different genes</b> often land on the same
+      pixel. Then the pixel is a <b>sum of two barcodes at different brightnesses</b>, and it
+      matches nothing in the codebook exactly.</li>
+  <li>To be clear about what "mixed" means: both genes are <b>physically there</b>. Two
+      molecules, two glows, one camera cell adding up their light. The split we are about to
+      recover is an accounting of that light ("6 units of Plp1 plus 2.5 of Sst"), <b>not</b> a
+      list of alternative guesses for one uncertain molecule. A pixel that is merely noisy or
+      blurry does not earn a second gene: it gets its one gene plus a leftover that looks like
+      noise, and the right response to noise is to stop, not to add genes.</li>
+  <li>Here is such a pixel, in a panel with three grids:
+    <ul>
+      <li><b>pixel colours</b>: the measurement, fixed;</li>
+      <li><b>pick 1 + pick 2</b>: the weighted sum of your two picks below,
+          $\beta_1 \times \text{barcode}_{\text{pick 1}} + \beta_2 \times \text{barcode}_{\text{pick 2}}$;</li>
+      <li><b>the leftover</b>: the pixel minus your picks' sum, whatever your picks have
+          not accounted for yet. (In regression language, the residual.)</li>
+    </ul>
+  </li>
+  <li>The looks-like scores at the bottom are live, and they score the <b>leftover</b>, not
+      the pixel: as your picks improve, the bars tell you what is left to find.</li>
+  <li><b>Your task: explain this pixel.</b> A good strategy, in three steps:
+    <ol>
+      <li>The tallest bar is your first suspect. Select it as pick 1 and raise its brightness
+          until the leftover stops glowing in that gene's cells. If cells turn <b>blue</b>, you
+          have removed brightness that was never there: back off. (Or press
+          <b>best brightness</b> and let least squares set the slider.)</li>
+      <li>Now look at the leftover and the bars again. Gray and flat? You are done.
+          Still glowing in a pattern? <b>Score it</b>: a second gene, invisible a moment ago
+          behind the first one, now tops the bars.</li>
+      <li>Add it as pick 2, set its brightness, and drive the leftover down to noise.</li>
+    </ol>
+  </li>
+  <li>There is also a <b>camera noise</b> slider. At 0 the camera is perfect and your peel can
+      drive the leftover to exactly zero. Push it up and watch the looks-like bars blur: past
+      some point the dim gene's bar sinks among the noise bars, and no method, greedy or
+      otherwise, could tell it from chance.</li>
+</ul>
+
+<div class="panel">
+  <div class="controls">
+    <fieldset>
+      <legend style="color:var(--red);">pick 1</legend>
+      <label>gene <select id="pe-g1"></select></label>
+      <label>brightness $\beta_1$ <b id="pe-o-b1"></b>
+        <input id="pe-b1" type="range" min="0" max="9" step="0.05" value="0" style="--thumb:#c1121f;"></label>
+      <button id="pe-f1">best brightness</button>
+    </fieldset>
+    <fieldset>
+      <legend style="color:var(--green);">pick 2</legend>
+      <label>gene <select id="pe-g2"></select></label>
+      <label>brightness $\beta_2$ <b id="pe-o-b2"></b>
+        <input id="pe-b2" type="range" min="0" max="9" step="0.05" value="0" style="--thumb:#3a9d6e;"></label>
+      <button id="pe-f2">best brightness</button>
+    </fieldset>
+    <fieldset style="flex:0 1 170px; min-width:150px;">
+      <legend>camera noise</legend>
+      <label>level $\sigma$ <b id="pe-o-ns"></b>
+        <input id="pe-ns" type="range" min="0" max="1" step="0.05" value="0.2" style="--thumb:#76746e;"></label>
+    </fieldset>
+    <div style="align-self:flex-start;"><button id="pe-reset">reset</button></div>
+  </div>
+  <div class="score">leftover MSE: <b id="pe-mse"></b>
+    <span style="color:var(--muted);">&nbsp;·&nbsp;noise floor ≈ <b id="pe-floor"></b></span>
+    <span id="pe-win" class="win"></span></div>
+  <div id="pe-fig"></div>
+  <div id="pe-bars"></div>
+</div>
+
+<ul>
+  <li>You just recovered a gene that was <b>invisible in the raw pixel</b>: nothing in the
+      codebook matches the mixed pixel, but once the dominant gene is peeled off, the second
+      one is unmistakable in the leftover.</li>
+  <li>This strategy, <i>find the best match, subtract it, repeat on the leftover</i>, is a real
+      algorithm called <b>matching pursuit</b>. You have been running it by hand.</li>
+  <li>But why all this peeling? We know how to fit a weighted sum of
+      known pieces to data. That is <b>least squares</b>, from the very first section of these
+      notes. Why not just fit all 16 genes at once and read off which $\beta$'s are big?</li>
+</ul>
+
+<div class="spacer"></div>
+
+<!-- ============================================================ 4. LS -->
+<h2>4. Why Not Least Squares on Every Gene?</h2>
+
+<ul>
+  <li>Let's try it. One press fits
+      $\;\text{pixel} \approx \beta_1\,\text{barcode}_1 + \cdots + \beta_{16}\,\text{barcode}_{16}\;$
+      to the same hard pixel (at its default camera noise), choosing all 16 $\beta$'s to minimize the MSE, with no other
+      constraint. The truth (6 of Plp1, 2.5 of Sst, nothing else) is drawn as diamonds.</li>
+</ul>
+
+<div class="panel">
+  <div style="margin:4px 0 8px;"><button id="fa-go" class="primary">fit all 16 genes (least squares)</button></div>
+  <div class="score" id="fa-score" style="display:none;">MSE: <b id="fa-mse"></b>
+    <span class="win">&nbsp;(the best fit on this page, and the most wrong answer)</span></div>
+  <div id="fa-bars"></div>
+</div>
+
+<ul>
+  <li>The fit is nearly perfect, and the answer is nonsense: <b>every gene is reported
+      present</b>, several with sizeable brightness, some negative. A pixel does not contain
+      sixteen genes, and no gene glows by $-0.8$.</li>
+  <li>The failure is structural, not numerical. The pixel is <b>12 numbers</b>; we asked for
+      <b>16 unknowns</b>. With more unknowns than measurements there are <b>infinitely many</b>
+      settings of the $\beta$'s with essentially zero error, and least squares has no reason to
+      prefer the physical one. It smears the pixel's brightness across the whole
+      codebook. (Real panels are worse: hundreds of genes against a few dozen numbers per
+      pixel.)</li>
+  <li>What least squares is missing is what you did naturally in section 3: <b>decide who is
+      present before fitting amounts</b>. Selection first, regression after, and regression
+      only ever on the short list of picks. The fitting was never the problem; the guest list
+      was.</li>
+  <li><b>"Why not the lasso, then?"</b> A fair question if you have met regularization.
+      The penalty we would really want is the <i>count</i> of genes used (the so-called L0
+      penalty), but minimizing with a count means trying subsets, the combinatorial search we
+      are avoiding. The lasso swaps the count for $\lambda \sum_g |\beta_g|$ (L1), which is
+      solvable and really does set many $\beta$'s to exactly zero. It can work here; the
+      reasons this chapter (and the real pipeline) goes greedy instead are practical. The
+      lasso needs $\lambda$ tuned until "about one to three genes per pixel" comes out, and
+      the same penalty that zeroes the losers also <b>shrinks the winners</b>, biasing the
+      brightness estimates low. The standard repair is to re-fit the selected genes by plain
+      least squares, which is precisely the re-fit step of the algorithm in the next section.
+      Greedy selection just gets there directly, a few cheap steps per pixel.</li>
+  <li><b>"Then why not learn the solver?"</b> One more step down the lasso road, and it lands
+      back in Part I. The lasso is solved by repeating two moves, hundreds of times over: a
+      small least squares step, then shrink-the-coefficients-and-zero-the-small-ones. Now
+      write out just ten of those repeats, one after another, and look at what each one does:
+      a weighted sum of its inputs, followed by a simple nonlinearity. That is a <b>layer</b>.
+      Ten repeats written out make a ten-layer network (in the literature this trick is called
+      <i>unrolling</i> the solver, and networks built this way are <i>unrolled algorithms</i>),
+      and the shrink step is just a shifted ReLU, so the whole thing is built from chapter 1's
+      lego blocks. Let the weights be <i>learned</i> from example pixels instead
+      of copied from the codebook, and you get <b>LISTA</b> (learned ISTA): a network that
+      produces sparse codes in one fast pass. Its output is the same kind of answer as
+      everything else in this chapter (brightnesses per gene, most of them zero), not
+      probabilities, and not alternative guesses for an uncertain pixel. It fixes both
+      complaints above, the slow iterations and the shrinkage bias, but it pays with
+      everything training always costs: it needs examples with trustworthy answers to
+      imitate, it only holds for data that looks like its training data, and a new codebook
+      means training again. For a pipeline that must work on any tissue with any gene panel
+      out of the box, the plain greedy loop keeps winning on simplicity, which is why it is
+      the one we now build.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<!-- ============================================================ 5. OMP -->
+<h2>5. The Flaw in Peeling, and the One-Line Fix</h2>
+
+<ul>
+  <li>So peeling wins. But it has a subtle flaw, and you may have already met it: with both
+      genes picked and both <b>best brightness</b> buttons pressed once, the leftover in
+      section 3 still glowed a little. Why?</li>
+  <li>Recall that Plp1 and Sst <b>share dyes in rounds 1 and 3</b>. When we set Plp1's
+      brightness <i>first, alone</i>, least squares gave it credit for everything in the shared
+      cells, including brightness that actually belongs to Sst. Peeling one at a time made
+      Plp1 <b>steal</b> from Sst:</li>
+</ul>
+
+<div class="panel">
+  <div style="margin:4px 0 8px;"><button id="rf-go" class="primary">re-fit the two picks together</button></div>
+  <div class="score">leftover MSE, peeling one at a time: <b id="rf-mse1"></b><span id="rf-mse2s">,
+    &nbsp;re-fitting together: <b id="rf-mse2"></b></span></div>
+  <div class="duo">
+    <div id="rf-res"></div>
+    <div id="rf-bars"></div>
+  </div>
+</div>
+
+<ul>
+  <li>One-at-a-time peeling lands on $\beta \approx 7.8$ and $1.4$; the truth is $6$ and $2.5$.
+      The overshoot on Plp1 is exactly the part of Sst that lives in their shared cells, and it
+      then goes missing from Sst's own estimate.</li>
+  <li>The fix costs one line: after every new pick, <b>re-fit all picked genes together</b>
+      with least squares. Two picks, two unknowns, twelve numbers: well determined, and
+      the shared cells are split correctly because both genes are on the guest list at once.
+      The estimates snap to $6.2$ and $2.5$, and the leftover drops to pure noise.</li>
+  <li>Peeling with this re-fit is called <b>orthogonal matching pursuit</b> (OMP):
+      "orthogonal" because after the re-fit, the leftover has <i>nothing in common</i> with any
+      picked barcode: zero looks-like score, nothing left to steal, and no gene ever gets
+      picked twice.</li>
+  <li>To be precise about what the re-fit fixes: it fixes the <b>amounts</b>. Given the picked
+      genes, joint least squares splits the shared cells correctly. It does not fix a wrong
+      <b>pick</b>: had the tallest bar pointed at the wrong gene, the re-fit would only tidy
+      the amounts of a wrong guest list. Both algorithms choose greedily and neither can
+      un-pick; the protections are the stopping rule below, and a codebook designed so that
+      barcodes do not overlap too much.</li>
+  <li>If you kept alternating the two best-brightness buttons in section 3 forever, the
+      sliders would crawl to these same values: the re-fit just jumps there in one solve.</li>
+  <li>When does the algorithm stop picking? When the leftover looks like noise: no bar stands
+      out, and taking more genes would only fit the noise, chapter 5's overfitting in
+      miniature.</li>
+  <li>So the full recipe is: <b>score, pick the best match, re-fit the picks together, repeat
+      on the leftover, stop at noise</b>. Selection is greedy, amounts come from a tiny least
+      squares, and the codebook-wide fit of section 4 is never needed.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>(Optional) Both Algorithms in Code</h2>
+<ul>
+  <li>Here is the hand-peeling of section 3 as a numpy loop. This is <b>matching pursuit</b>:
+      fit the newest pick alone against the current leftover, subtract it, never look back.</li>
+</ul>
+<pre>
+def mp(pixel, codebook, n_picks):          # codebook: (12, 16), one column per gene
+    picked, beta = [], []
+    leftover = pixel.copy()
+    for _ in range(n_picks):
+        scores = codebook.T @ leftover     # which barcode does the leftover look like?
+        g = int(np.abs(scores).argmax())
+        picked.append(g)
+        code = codebook[:, g]
+        b = (code @ leftover) / (code @ code)  # brightness of the NEW pick alone
+        beta.append(b)                         # earlier brightnesses never revisited
+        leftover = leftover - b * code         # subtract just the new pick
+    return picked, beta
+</pre>
+<ul>
+  <li>One detail: <code>scores</code> here are plain sums of products, without section 2's two
+      divisions. That is safe because the divisions cannot change which gene wins: the
+      leftover's length scales every gene's score equally, and all our barcodes have the same
+      length (three lit cells each). The code keeps only what affects the answer.</li>
+  <li><b>Orthogonal</b> matching pursuit keeps the selection step and changes only the fitting,
+      the three numbered lines below: every picked gene is re-fitted <i>together</i> against
+      the <i>original pixel</i>, and the leftover is rebuilt from the pixel instead of updated
+      in place.</li>
+</ul>
+<pre>
+def omp(pixel, codebook, n_picks):
+    picked = []
+    leftover = pixel.copy()
+    for _ in range(n_picks):
+        scores = codebook.T @ leftover     # selection: same as mp()
+        picked.append(int(np.abs(scores).argmax()))
+        chosen = codebook[:, picked]                          # (1) ALL picks so far
+        beta = np.linalg.lstsq(chosen, pixel, rcond=None)[0]  # (2) re-fit them together
+        leftover = pixel - chosen @ beta                      # (3) rebuilt from the pixel
+    return picked, beta
+</pre>
+<ul>
+  <li>That is the entire difference. <code>mp()</code> asks "how bright is my newest pick,
+      given the leftover I happen to have?"; <code>omp()</code> asks "what brightnesses best
+      explain the original pixel, using everything picked so far?". On our hard pixel both
+      pick Plp1 then Sst, but <code>mp()</code> returns brightnesses 7.8 and 1.4 while
+      <code>omp()</code> returns 6.2 and 2.5, the numbers from section 5.</li>
+</ul>
+
+<div class="spacer"></div>
+
+<h2>Chapter Highlights</h2>
+<ol>
+  <li>Sparse coding: a measurement is a weighted sum of a <b>few</b> pieces from a large known
+      collection; the job is to find which pieces and their weights.</li>
+  <li>Least squares on the whole collection fails when unknowns outnumber measurements: it
+      fits perfectly and answers nothing.</li>
+  <li>Matching pursuit: score every piece against the leftover, pick the best match, subtract,
+      repeat. Selection first, fitting after.</li>
+  <li>One-at-a-time fitting lets overlapping pieces steal brightness from each other.</li>
+  <li>Orthogonal matching pursuit re-fits all picked pieces together after every pick, which
+      splits shared cells correctly and leaves a leftover with nothing in common with any
+      pick.</li>
+</ol>
+
+<div class="spacer"></div>
+
+<footer>
+Part I ends with <a href="chapter6.html">Chapter 6: The Training Toolkit</a>.
+</footer>
+
+</main>
+<script>
+"use strict";
+const C = { blue:"#2a78d6", orange:"#eb6834", red:"#c1121f", green:"#3a9d6e",
+            purple:"#8a63c4", surface:"#fcfcfb", grid:"#e1e0d9", axis:"#c3c2b7",
+            ink:"#0b0b0b", ink2:"#52514e", muted:"#898781" };
+const FONT = { family:'system-ui, -apple-system, "Segoe UI", sans-serif',
+               color:C.ink2, size:12 };
+const $ = id => document.getElementById(id);
+
+function paintSlider(el) {
+  const min = +el.min, max = +el.max, v = +el.value;
+  const pct = (v - min) / (max - min) * 100;
+  const color = getComputedStyle(el).getPropertyValue("--thumb") || "#52514e";
+  el.style.background = `linear-gradient(to right, ${color} ${pct}%, var(--grid) ${pct}%)`;
+}
+
+/* ---- the toy world: 16 genes, 3 rounds x 4 channels ------------------- */
+// each gene = one lit channel per round (its dye sequence)
+const GENES = [
+  ["Plp1",    [0, 1, 2]],   // the hard pixel's dominant gene
+  ["Sst",     [0, 3, 2]],   // shares rounds 1 and 3 with Plp1
+  ["Snca",    [1, 0, 3]],
+  ["Vim",     [2, 2, 0]],
+  ["Npy",     [3, 1, 1]],
+  ["Pvalb",   [1, 2, 3]],
+  ["Gad1",    [2, 0, 1]],   // the easy pixel's gene
+  ["Slc17a7", [3, 3, 3]],
+  ["Calb1",   [0, 2, 1]],
+  ["Calb2",   [1, 1, 0]],
+  ["Cck",     [2, 3, 2]],
+  ["Vip",     [3, 0, 0]],
+  ["Reln",    [1, 3, 1]],
+  ["Th",      [2, 1, 3]],
+  ["Chat",    [3, 2, 2]],
+  ["Penk",    [0, 0, 3]],
+];
+const NG = GENES.length, NR = 3, NC = 4, DIM = NR * NC;
+const NAMES = GENES.map(g => g[0]);
+const CODE = GENES.map(([, dyes]) => {
+  const v = new Array(DIM).fill(0);
+  dyes.forEach((d, r) => v[r * NC + d] = 1);
+  return v;
+});
+const iA = 0, iB = 1, iEASY = 6;             // Plp1, Sst, Gad1
+const ALPHA = 6, BETA = 2.5;                 // true brightnesses in the hard pixel
+
+// fixed noise draws (sigma = 0.2), so every visitor sees the same numbers
+const NOISE_EASY = [-0.2275, -0.1683, -0.1105, -0.4412, -0.19, 0.1343,
+                    -0.1266, 0.0931, -0.0606, -0.1949, 0.1447, -0.1801];
+const NOISE_MIX  = [0.3966, -0.0654, 0.0668, 0.2216, 0.1235, 0.0426,
+                    0.4409, -0.1165, 0.1455, -0.1413, 0.0079, 0.0144];
+
+const dot = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0);
+const norm = a => Math.sqrt(dot(a, a));
+const combo = terms => {                      // [[coef, vec], ...] -> vector sum
+  const v = new Array(DIM).fill(0);
+  for (const [c, vec] of terms) for (let i = 0; i < DIM; i++) v[i] += c * vec[i];
+  return v;
+};
+const Y_EASY = combo([[5, CODE[iEASY]], [1, NOISE_EASY]]);
+const Y_MIX  = combo([[ALPHA, CODE[iA]], [BETA, CODE[iB]], [1, NOISE_MIX]]);
+const mse = v => dot(v, v) / DIM;
+const looksLike = y => {
+  const ny = norm(y);
+  return CODE.map(g => ny < 1e-9 ? 0 : dot(y, g) / (norm(g) * ny));
+};
+
+// Gaussian elimination with partial pivoting (A is small: at most 16 x 16)
+function solve(A, b) {
+  const n = b.length, M = A.map((row, i) => row.concat([b[i]]));
+  for (let k = 0; k < n; k++) {
+    let p = k;
+    for (let i = k + 1; i < n; i++) if (Math.abs(M[i][k]) > Math.abs(M[p][k])) p = i;
+    [M[k], M[p]] = [M[p], M[k]];
+    for (let i = k + 1; i < n; i++) {
+      const f = M[i][k] / M[k][k];
+      for (let j = k; j <= n; j++) M[i][j] -= f * M[k][j];
+    }
+  }
+  const x = new Array(n).fill(0);
+  for (let i = n - 1; i >= 0; i--) {
+    let s = M[i][n];
+    for (let j = i + 1; j < n; j++) s -= M[i][j] * x[j];
+    x[i] = s / M[i][i];
+  }
+  return x;
+}
+// least squares of y on the picked genes only (normal equations)
+function lstsq(picks, y) {
+  const A = picks.map(g1 => picks.map(g2 => dot(CODE[g1], CODE[g2])));
+  const b = picks.map(g => dot(CODE[g], y));
+  return solve(A, b);
+}
+
+/* ---- plotting helpers -------------------------------------------------- */
+// one colour per dye/channel (no blue: blue is reserved for negative brightness)
+const DYECOL = [C.orange, C.green, C.purple, "#c8930c"];
+const RLAB = ["round 1", "round 2", "round 3"];
+const CLAB = ["ch 1", "ch 2", "ch 3", "ch 4"];
+const toZ = v => CLAB.map((_, c) => RLAB.map((_, r) => v[r * NC + c]));
+
+// a measurement heatmap: one trace per channel, tinted with that channel's dye
+// colour (depth = brightness, blue = negative). Each trace carries the full
+// 4 x 3 grid with the other channels' rows set to null (drawn transparent), so
+// the four traces tile identically on the shared axes.
+const maskZ = (z, c) => z.map((row, cc) => cc === c ? row : row.map(() => null));
+function heatSet(v, extra) {
+  const z = toZ(v);
+  return CLAB.map((lab, c) => Object.assign({
+    type:"heatmap", z:maskZ(z, c), x:RLAB, y:CLAB,
+    colorscale:[[0, C.blue], [0.5, "#ffffff"], [1, DYECOL[c]]],
+    zmin:-7.5, zmax:7.5, showscale:false, xgap:2, ygap:2, hoverongaps:false,
+    hovertemplate:"%{x} · %{y}: %{z:.2f}<extra></extra>",
+  }, extra || {}));
+}
+const axOff = { visible:false };
+const axCat = { gridcolor:C.grid, linecolor:C.axis, tickcolor:C.axis, tickfont:{size:11},
+                tickson:"boundaries", tickangle:0 };
+
+function barLayout(extra) {
+  return Object.assign({
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT,
+    margin:{l:45, r:10, t:10, b:65}, showlegend:false,
+    xaxis:Object.assign({}, axCat, {tickangle:-50}),
+    yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis},
+    hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+  }, extra || {});
+}
+const PCFG = {responsive:true, displayModeBar:false};
+
+/* ------------------------------------------------- 1. the codebook ---- */
+(function () {
+  // frame every barcode so the 16 mini grids read as 16 cards, not one table
+  const frame = { showticklabels:false, ticks:"", showline:true, mirror:true,
+                  linecolor:C.axis, showgrid:true, gridcolor:C.grid,
+                  tickson:"boundaries", zeroline:false };
+  const dyeScale = [[0, "#ffffff"], [0.124, "#ffffff"],
+    [0.125, DYECOL[0]], [0.374, DYECOL[0]], [0.375, DYECOL[1]], [0.624, DYECOL[1]],
+    [0.625, DYECOL[2]], [0.874, DYECOL[2]], [0.875, DYECOL[3]], [1, DYECOL[3]]];
+  const traces = [], layout = {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:340,
+    margin:{l:6, r:6, t:52, b:34},
+    grid:{rows:2, columns:8, pattern:"independent", xgap:0.30, ygap:0.45},
+    annotations:[],
+    hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+  };
+  for (let i = 0; i < NG; i++) {
+    const ax = i === 0 ? "" : String(i + 1);
+    const dyes = GENES[i][1];   // z encodes the dye index (1-4), 0 = dark cell
+    const zDye = CLAB.map((_, c) => RLAB.map((_, r) => dyes[r] === c ? c + 1 : 0));
+    const cd = CLAB.map((_, c) => RLAB.map((_, r) => dyes[r] === c ? "dye " + (c + 1) : "dark"));
+    traces.push({ type:"heatmap", z:zDye, customdata:cd, x:RLAB, y:CLAB,
+      colorscale:dyeScale, zmin:0, zmax:4, showscale:false, xgap:3, ygap:3,
+      xaxis:"x" + ax, yaxis:"y" + ax,
+      hovertemplate:"<b>" + NAMES[i] + "</b><br>%{x}<br>%{y}<br>%{customdata}<extra></extra>" });
+    layout["xaxis" + ax] = Object.assign({}, frame);
+    layout["yaxis" + ax] = Object.assign({}, frame,
+      {autorange:"reversed", scaleanchor:"x" + ax, scaleratio:1});
+    layout.annotations.push({ xref:`x${ax || "1"} domain`, yref:`y${ax || "1"} domain`,
+      x:0.5, y:1.18, text:NAMES[i], showarrow:false, font:{size:11.5, color:C.ink2} });
+  }
+  DYECOL.forEach((col, k) => layout.annotations.push({ xref:"paper", yref:"paper",
+    x:0.17 + k * 0.17, y:-0.115, text:"■ dye " + (k + 1) + " (channel " + (k + 1) + ")",
+    showarrow:false, xanchor:"left", font:{size:11.5, color:col} }));
+  layout.annotations.push({ xref:"paper", yref:"paper", x:0.5, y:1.13, yanchor:"bottom",
+    text:"in every card, rows are channels 1 to 4 and columns are rounds 1 to 3",
+    showarrow:false, font:{size:11.5, color:C.muted} });
+  Plotly.newPlot("cb-fig", traces, layout, PCFG);
+})();
+
+/* ------------------------------------------------- 2. the easy pixel -- */
+(function () {
+  Plotly.newPlot("ez-fig", heatSet(Y_EASY), {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT,
+    height:240, margin:{l:40, r:6, t:26, b:26},
+    xaxis:Object.assign({}, axCat, {range:[-0.5, 2.5], constrain:"domain"}),
+    yaxis:Object.assign({}, axCat,
+      {range:[3.5, -0.5], scaleanchor:"x", scaleratio:1, constrain:"domain"}),
+    annotations:[{xref:"paper", yref:"paper", x:0.5, y:1.02, yanchor:"bottom", text:"pixel colours",
+                  showarrow:false, font:{size:12, color:C.ink2}}],
+    hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+  }, PCFG);
+
+  Plotly.newPlot("ez-bars", [{ type:"bar", x:NAMES, y:new Array(NG).fill(0),
+    marker:{color:NAMES.map(() => C.muted)},
+    hovertemplate:"%{x}: %{y:.2f}<extra></extra>" }],
+    barLayout({height:240, yaxis:{gridcolor:C.grid, zerolinecolor:C.axis,
+      linecolor:C.axis, tickcolor:C.axis, range:[-0.5, 1.05],
+      title:{text:"looks-like score", font:{size:11}}}}), PCFG);
+
+  $("ez-go").addEventListener("click", () => {
+    const cs = looksLike(Y_EASY);
+    const top = cs.indexOf(Math.max(...cs));
+    Plotly.restyle("ez-bars", {
+      y:[cs], "marker.color":[cs.map((_, i) => i === top ? C.orange : C.muted)] }, [0]);
+  });
+})();
+
+/* ---------------------------------------------- 2b. the score, by hand -- */
+(function () {
+  const sel = $("sc-g");
+  NAMES.forEach((n, i) => sel.appendChild(new Option(n, i)));
+  sel.value = iEASY;
+
+  Plotly.newPlot("sc-fig", heatSet(Y_EASY), {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT,
+    height:250, margin:{l:40, r:6, t:28, b:26},
+    xaxis:Object.assign({}, axCat, {range:[-0.5, 2.5], constrain:"domain"}),
+    yaxis:Object.assign({}, axCat,
+      {range:[3.5, -0.5], scaleanchor:"x", scaleratio:1, constrain:"domain"}),
+    annotations:[{xref:"paper", yref:"paper", x:0.5, y:1.02, yanchor:"bottom",
+      text:"the easy pixel, with the chosen barcode's lit cells outlined",
+      showarrow:false, font:{size:12, color:C.ink2}}],
+    hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+  }, PCFG);
+
+  function update() {
+    const g = +sel.value, dyes = GENES[g][1];
+    const shapes = dyes.map((d, r) => ({
+      type:"rect", xref:"x", yref:"y",
+      x0:r - 0.46, x1:r + 0.46, y0:d - 0.46, y1:d + 0.46,
+      line:{color:C.ink, width:2.5}, fillcolor:"rgba(0,0,0,0)",
+    }));
+    const cells = dyes.map((d, r) => Y_EASY[r * NC + d]);
+    const raw = cells.reduce((a, b) => a + b, 0);
+    const score = raw / (norm(Y_EASY) * norm(CODE[g]));
+    $("sc-out").innerHTML =
+      "sum inside the outlines: " + cells.map(v => v.toFixed(2)).join(" + ") +
+      " = <b>" + raw.toFixed(2) + "</b><br>score: " + raw.toFixed(2) +
+      " ÷ (" + norm(Y_EASY).toFixed(2) + " × " + norm(CODE[g]).toFixed(2) +
+      ") = <b>" + score.toFixed(3) + "</b>";
+    Plotly.relayout("sc-fig", {shapes});
+  }
+  sel.addEventListener("change", update);
+  update();
+})();
+
+/* ------------------------------------------------- 3. peel the pixel -- */
+(function () {
+  for (const id of ["pe-g1", "pe-g2"]) {
+    const sel = $(id);
+    sel.appendChild(new Option("(none)", -1));
+    NAMES.forEach((n, i) => sel.appendChild(new Option(n, i)));
+  }
+
+  // the noise slider rescales the one fixed noise pattern (drawn at sigma=0.2),
+  // so the panel stays deterministic at every level
+  const BASE_SIGMA = 0.2, BASE_FLOOR = mse(NOISE_MIX);
+  let yMix = Y_MIX.slice(), floorNow = BASE_FLOOR;
+  function setNoise() {
+    const s = +$("pe-ns").value, k = s / BASE_SIGMA;
+    $("pe-o-ns").textContent = s.toFixed(2);
+    yMix = combo([[ALPHA, CODE[iA]], [BETA, CODE[iB]], [k, NOISE_MIX]]);
+    floorNow = k * k * BASE_FLOOR;
+    $("pe-floor").textContent = floorNow.toFixed(3);
+    paintSlider($("pe-ns"));
+  }
+  setNoise();
+
+  const zeros = new Array(DIM).fill(0);
+  Plotly.newPlot("pe-fig", [
+    ...heatSet(Y_MIX, {xaxis:"x",  yaxis:"y"}),
+    ...heatSet(zeros, {xaxis:"x2", yaxis:"y2"}),
+    ...heatSet(Y_MIX, {xaxis:"x3", yaxis:"y3"}),
+  ], {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT, height:256,
+    margin:{l:40, r:6, t:36, b:26},
+    grid:{rows:1, columns:3, pattern:"independent", xgap:0.10},
+    xaxis:Object.assign({}, axCat, {range:[-0.5, 2.5], constrain:"domain"}),
+    yaxis:Object.assign({}, axCat,
+      {range:[3.5, -0.5], scaleanchor:"x", scaleratio:1, constrain:"domain"}),
+    xaxis2:Object.assign({}, axCat, {range:[-0.5, 2.5], constrain:"domain"}),
+    yaxis2:Object.assign({}, axCat, {range:[3.5, -0.5], showticklabels:false,
+      scaleanchor:"x2", scaleratio:1, constrain:"domain"}),
+    xaxis3:Object.assign({}, axCat, {range:[-0.5, 2.5], constrain:"domain"}),
+    yaxis3:Object.assign({}, axCat, {range:[3.5, -0.5], showticklabels:false,
+      scaleanchor:"x3", scaleratio:1, constrain:"domain"}),
+    annotations:["pixel colours", "pick 1 + pick 2", "the leftover"].map((t, i) => ({
+      xref:`x${i ? i + 1 : "1"} domain`, yref:`y${i ? i + 1 : "1"} domain`,
+      x:0.5, y:1.02, yanchor:"bottom", text:t, showarrow:false,
+      font:{size:12, color:C.ink2}})),
+    hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+  }, PCFG);
+
+  Plotly.newPlot("pe-bars", [{ type:"bar", x:NAMES, y:looksLike(Y_MIX),
+    marker:{color:NAMES.map(() => C.muted)},
+    hovertemplate:"%{x}: %{y:.2f}<extra></extra>" }],
+    barLayout({height:230, yaxis:{gridcolor:C.grid, zerolinecolor:C.axis,
+      linecolor:C.axis, tickcolor:C.axis, range:[-0.5, 1.05],
+      title:{text:"looks-like score of the leftover", font:{size:11}}}}), PCFG);
+
+  const picks = () => [
+    {g:+$("pe-g1").value, b:+$("pe-b1").value},
+    {g:+$("pe-g2").value, b:+$("pe-b2").value},
+  ];
+
+  function update() {
+    const [p1, p2] = picks();
+    $("pe-o-b1").textContent = p1.b.toFixed(2);
+    $("pe-o-b2").textContent = p2.b.toFixed(2);
+    const model = combo([[p1.g >= 0 ? p1.b : 0, CODE[Math.max(p1.g, 0)]],
+                         [p2.g >= 0 ? p2.b : 0, CODE[Math.max(p2.g, 0)]]]);
+    const resid = yMix.map((v, i) => v - model[i]);
+    const m = mse(resid);
+    $("pe-mse").textContent = m.toFixed(3);
+
+    const cs = looksLike(resid);
+    const top = cs.indexOf(Math.max(...cs));
+    const colors = cs.map((_, i) =>
+      i === p1.g || i === p2.g ? C.blue
+        : (i === top && m > 3 * floorNow + 0.005 ? C.orange : C.muted));
+
+    const rightPicks = p1.b > 0 && p2.b > 0 &&
+      ((p1.g === iA && p2.g === iB) || (p1.g === iB && p2.g === iA));
+    $("pe-win").textContent =
+      m < 1.5 * floorNow + 0.01 ? "(nothing left but noise: the pixel is explained)" :
+      rightPicks && m < floorNow + 0.8 ? "(so close: the leftover still glows, and some cells went blue; section 5 explains)" :
+      Math.min(...resid) < -1 ? "(blue cells: your picks are brighter than the pixel there)" : "";
+
+    const zp = toZ(yMix), zm = toZ(model), zr = toZ(resid);
+    Plotly.restyle("pe-fig",
+      {z: CLAB.map((_, c) => maskZ(zp, c)).concat(
+           CLAB.map((_, c) => maskZ(zm, c)), CLAB.map((_, c) => maskZ(zr, c)))},
+      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    Plotly.restyle("pe-bars", {y:[cs], "marker.color":[colors]}, [0]);
+    paintSlider($("pe-b1")); paintSlider($("pe-b2"));
+  }
+
+  function slideTo(el, target) {
+    const from = +el.value, STEPS = 30;
+    let k = 0;
+    (function tick() {
+      k++;
+      const e = 1 - Math.pow(1 - k / STEPS, 3);
+      el.value = (from + (target - from) * e).toFixed(3);
+      update();
+      if (k < STEPS) requestAnimationFrame(tick);
+      else { el.value = target; update(); }
+    })();
+  }
+  // best brightness for one pick, holding the other fixed (a 1-gene least squares)
+  function best(slot) {
+    const [p1, p2] = picks();
+    const me = slot === 1 ? p1 : p2, other = slot === 1 ? p2 : p1;
+    if (me.g < 0) return;
+    const target = yMix.map((v, i) =>
+      v - (other.g >= 0 ? other.b * CODE[other.g][i] : 0));
+    const c = Math.max(0, Math.min(9, dot(target, CODE[me.g]) / dot(CODE[me.g], CODE[me.g])));
+    slideTo($(slot === 1 ? "pe-b1" : "pe-b2"), c);
+  }
+  $("pe-f1").addEventListener("click", () => best(1));
+  $("pe-f2").addEventListener("click", () => best(2));
+  $("pe-reset").addEventListener("click", () => {
+    $("pe-g1").value = -1; $("pe-g2").value = -1;
+    $("pe-b1").value = 0;  $("pe-b2").value = 0;
+    $("pe-ns").value = BASE_SIGMA;
+    setNoise(); update();
+  });
+  ["pe-g1", "pe-g2"].forEach(id => $(id).addEventListener("change", update));
+  ["pe-b1", "pe-b2"].forEach(id => $(id).addEventListener("input", update));
+  $("pe-ns").addEventListener("input", () => { setNoise(); update(); });
+  update();
+})();
+
+/* ------------------------------------------- 4. least squares, all 16 -- */
+(function () {
+  Plotly.newPlot("fa-bars", [
+    { type:"bar", x:NAMES, y:new Array(NG).fill(0), name:"least squares β",
+      marker:{color:NAMES.map((_, i) => i === iA || i === iB ? C.orange : C.muted)},
+      hovertemplate:"%{x}: β = %{y:.2f}<extra></extra>" },
+    { type:"scatter", x:NAMES, y:NAMES.map((_, i) => i === iA ? ALPHA : i === iB ? BETA : 0),
+      mode:"markers", name:"the truth",
+      marker:{symbol:"diamond", size:8, color:C.ink, opacity:0.85},
+      hovertemplate:"%{x}: truth = %{y:.1f}<extra></extra>" },
+  ], barLayout({height:280, showlegend:true,
+    legend:{orientation:"h", x:0, y:1.04, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)"},
+    yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+      range:[-1.5, 8], title:{text:"brightness β", font:{size:11}}}}), PCFG);
+
+  $("fa-go").addEventListener("click", () => {
+    // minimum-norm-ish least squares over all 16 genes (tiny ridge for stability)
+    const A = CODE.map(g1 => CODE.map(g2 => dot(g1, g2) + (g1 === g2 ? 1e-6 : 0)));
+    const beta = solve(A, CODE.map(g => dot(g, Y_MIX)));
+    const fit = combo(CODE.map((g, i) => [beta[i], g]));
+    $("fa-score").style.display = "block";
+    $("fa-mse").textContent = mse(Y_MIX.map((v, i) => v - fit[i])).toFixed(4);
+    Plotly.restyle("fa-bars", {y:[beta]}, [0]);
+  });
+})();
+
+/* ------------------------------------------- 5. the stealing, re-fit -- */
+(function () {
+  // one-at-a-time peel (matching pursuit), then the joint re-fit (OMP)
+  const a = CODE[iA], b = CODE[iB];
+  const cA = dot(Y_MIX, a) / dot(a, a);
+  const r1 = Y_MIX.map((v, i) => v - cA * a[i]);
+  const cB = dot(r1, b) / dot(b, b);
+  const residMP = r1.map((v, i) => v - cB * b[i]);
+  const [oA, oB] = lstsq([iA, iB], Y_MIX);
+  const residOMP = Y_MIX.map((v, i) => v - oA * a[i] - oB * b[i]);
+
+  $("rf-mse1").textContent = mse(residMP).toFixed(3);
+  $("rf-mse2").textContent = mse(residOMP).toFixed(3);
+  $("rf-mse2s").style.visibility = "hidden";
+
+  Plotly.newPlot("rf-res", heatSet(residMP), {
+    paper_bgcolor:C.surface, plot_bgcolor:C.surface, font:FONT,
+    height:250, margin:{l:40, r:6, t:30, b:26},
+    xaxis:Object.assign({}, axCat, {range:[-0.5, 2.5], constrain:"domain"}),
+    yaxis:Object.assign({}, axCat,
+      {range:[3.5, -0.5], scaleanchor:"x", scaleratio:1, constrain:"domain"}),
+    annotations:[{xref:"paper", yref:"paper", x:0.5, y:1.02, yanchor:"bottom",
+                  text:"the leftover", showarrow:false, font:{size:12, color:C.ink2}}],
+    hoverlabel:{bgcolor:"#fff", bordercolor:C.axis, font:{color:C.ink, size:12}},
+  }, PCFG);
+
+  const cats = ["Plp1  (truth 6)", "Sst  (truth 2.5)"];
+  Plotly.newPlot("rf-bars", [
+    { type:"bar", x:cats, y:[ALPHA, BETA], name:"the truth",
+      marker:{color:C.axis}, hovertemplate:"truth: %{y:.1f}<extra></extra>" },
+    { type:"bar", x:cats, y:[cA, cB], name:"peel one at a time",
+      marker:{color:C.orange}, hovertemplate:"one at a time: %{y:.2f}<extra></extra>" },
+    { type:"bar", x:cats, y:[0, 0], name:"re-fit together",
+      marker:{color:C.blue}, hovertemplate:"re-fit together: %{y:.2f}<extra></extra>" },
+  ], barLayout({height:250, showlegend:true, barmode:"group",
+    legend:{orientation:"h", x:0, y:1.04, yanchor:"bottom", bgcolor:"rgba(0,0,0,0)"},
+    xaxis:Object.assign({}, axCat, {tickangle:0}),
+    yaxis:{gridcolor:C.grid, zerolinecolor:C.axis, linecolor:C.axis, tickcolor:C.axis,
+      range:[0, 8.6], title:{text:"brightness β", font:{size:11}}}}), PCFG);
+
+  $("rf-go").addEventListener("click", () => {
+    Plotly.restyle("rf-bars", {y:[[oA, oB]]}, [2]);
+    Plotly.restyle("rf-res", {z: CLAB.map((_, c) => maskZ(toZ(residOMP), c))}, [0, 1, 2, 3]);
+    $("rf-mse2s").style.visibility = "visible";
+  });
+})();
+
+document.querySelectorAll("input[type=range]").forEach(paintSlider);
+</script>
+<nav class="side" id="sidenav"></nav>
+<script src="nav.js"></script>
+</body>
+</html>
