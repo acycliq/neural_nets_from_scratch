@@ -20,7 +20,7 @@
     : `<a href="${page}"${page === here ? ' class="here"' : ""}>${title}</a>`;
 
   // sidebar (shown >= 1120px by site.css)
-  let nav = '<a class="site" href="index.html">Neural nets from scratch</a>';
+  let nav = '<a class="site" href="index.html">DL/ML Notes</a>';
   for (const [page, title] of chapters) {
     nav += entry([page, title]);
     if (page === here) {
